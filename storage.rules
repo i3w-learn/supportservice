@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Attachments are served only through 15-minute signed URLs minted by the
+// API (§9). No direct client access, read or write.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
