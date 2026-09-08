@@ -14,8 +14,6 @@ Design: [`support-system-design.md`](./support-system-design.md).
 | `firestore.rules` | The only wall in front of the data (§9) |
 | `firestore.indexes.json` | Composite indexes from §8 |
 | `storage.rules` | Deny-all — attachments go out via signed URLs |
-| `infra/` | Pulumi (GCP project `ai-powered-479515`) |
-| `rules-tests/` | Node tests for `firestore.rules` |
 
 ## Getting started
 
@@ -29,6 +27,15 @@ just dash             # dashboard on :5173
 
 Copy `backend/.env.example` → `backend/.env` and
 `frontend/.env.example` → `frontend/.env.local` first.
+
+## Not built yet
+
+| Piece | Note |
+|---|---|
+| Firestore listeners | The dashboard runs on `frontend/src/lib/mock.ts`. Swap for `onSnapshot`; the types are already the real shapes |
+| API handlers | The seven module packages are empty. See §3 and §9 of the design |
+| Infra as code | Pulumi 3 + pulumi-gcp 8, per §10. Cloud Run, indexes, Scheduler jobs, Secret Manager, IAM |
+| Rules tests | `@firebase/rules-unit-testing` is Node-only. Must cover: a signed-in non-admin is denied every read |
 
 ## Before first deploy
 
