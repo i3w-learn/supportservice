@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
@@ -15,7 +16,8 @@ def get_db() -> firestore.firestore.Client:
     global _app
     if _app is None:
         _app = firebase_admin.initialize_app()
-    return firestore.client(_app)
+    db_name = os.environ.get("FIRESTORE_DATABASE", "whatsapp-support-service")
+    return firestore.client(_app, database_id=db_name)
 
 
 def _to_camel(name: str) -> str:
