@@ -45,7 +45,8 @@ def from_firestore(data: dict[str, Any]) -> dict[str, Any]:
 
 def get_doc(collection: str, doc_id: str) -> dict[str, Any] | None:
     doc = get_db().collection(collection).document(doc_id).get()
-    return from_firestore(doc.to_dict()) if doc.exists else None
+    data = doc.to_dict()
+    return from_firestore(data) if data is not None else None
 
 
 def set_doc(collection: str, doc_id: str, data: dict[str, Any]) -> None:
