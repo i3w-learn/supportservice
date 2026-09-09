@@ -7,6 +7,8 @@ import os
 
 from fastapi import FastAPI
 
+from support_service.channel import webhook_router
+
 # Interactive docs are a local-dev convenience. In production this is an
 # admin-only service behind Firebase Auth — it should not advertise its
 # surface. Cloud Run sets ENV=production.
@@ -20,6 +22,8 @@ app = FastAPI(
     redoc_url="/redoc" if _IS_DEV else None,
     openapi_url="/openapi.json" if _IS_DEV else None,
 )
+
+app.include_router(webhook_router)
 
 
 @app.get("/healthz", tags=["ops"], summary="Liveness probe")
