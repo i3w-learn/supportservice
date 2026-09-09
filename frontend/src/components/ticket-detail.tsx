@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCheck, Clock3, ImageIcon, Loader2, ShieldCheck } fr
 
 import { FailedLozenge, ServiceTag, SlaLozenge, StatusLozenge } from "@/components/lozenge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
@@ -14,7 +15,7 @@ import { clockTime, dayLabel, formatCountdown, relativeTime, replyWindow } from 
 interface Props {
   ticket: Ticket | null
   onTake: (id: string) => void
-  onNote: (id: string) => void
+  onNote: (id: string, text: string) => void
   onResolve: (id: string, text: string) => void
   onResend: (id: string) => void
   /** Set when a drag onto "Awaiting delivery" needs a resolution written. */
@@ -31,6 +32,8 @@ export function TicketDetail({
 }: Props) {
   const [draft, setDraft] = useState("")
   const [composing, setComposing] = useState(startComposing)
+  const [noteDraft, setNoteDraft] = useState("")
+  const [notingComposing, setNotingComposing] = useState(false)
   const [, tick] = useState(0)
 
   // The countdown is live because it changes what we are allowed to send.
@@ -42,6 +45,8 @@ export function TicketDetail({
   useEffect(() => {
     setComposing(startComposing)
     setDraft("")
+    setNotingComposing(false)
+    setNoteDraft("")
   }, [ticket?.ticketId, startComposing])
 
   if (!ticket) {
@@ -55,6 +60,9 @@ export function TicketDetail({
   const failed = ticket.resolution?.deliveryState === "failed"
   const canTake = ticket.status === "open"
   const canResolve = ticket.status === "open" || ticket.status === "in_progress"
+  // messages/events live in subcollections and are optional on the base type.
+  const messages = ticket.messages ?? []
+  const events = ticket.events ?? []
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -86,15 +94,15 @@ export function TicketDetail({
       <Tabs defaultValue="conversation" className="flex min-h-0 flex-1 flex-col gap-0">
         <TabsList className="mx-5 mt-3 self-start">
           <TabsTrigger value="conversation">Conversation</TabsTrigger>
-          <TabsTrigger value="activity">Activity · {ticket.events.length}</TabsTrigger>
+          <TabsTrigger value="activity">Activity · {events.length}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="conversation" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <Thread messages={ticket.messages} />
+          <Thread messages={messages} />
         </TabsContent>
 
         <TabsContent value="activity" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <ActivityLog events={ticket.events} />
+          <ActivityLog events={events} />
         </TabsContent>
       </Tabs>
 
@@ -122,11 +130,53 @@ export function TicketDetail({
                   Retry send
                 </Button>
               )}
-              <Button variant="ghost" size="sm" onClick={() => onNote(ticket.ticketId)}>
-                Add note
-              </Button>
+              {!notingComposing && (
+                <Button variant="ghost" size="sm" onClick={() => setNotingComposing(true)}>
+                  Add note
+                </Button>
+              )}
               <span className="ml-auto text-xs text-muted-foreground">{hintFor(ticket)}</span>
             </div>
+
+            {notingComposing && (
+              <div className="flex items-center gap-2">
+                <Input
+                  autoFocus
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                  placeholder="Internal note — never sent to the user"
+                  className="h-8 flex-1 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && noteDraft.trim()) {
+                      onNote(ticket.ticketId, noteDraft.trim())
+                      setNotingComposing(false)
+                      setNoteDraft("")
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  disabled={!noteDraft.trim()}
+                  onClick={() => {
+                    onNote(ticket.ticketId, noteDraft.trim())
+                    setNotingComposing(false)
+                    setNoteDraft("")
+                  }}
+                >
+                  Save
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setNotingComposing(false)
+                    setNoteDraft("")
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
 
             {composing && (
               <div className="flex flex-col gap-2.5">
