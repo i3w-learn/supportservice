@@ -7,6 +7,7 @@ import os
 
 from fastapi import FastAPI
 
+from support_service.admin_api.routes import router as admin_router
 from support_service.channel import webhook_router
 
 # Interactive docs are a local-dev convenience. In production this is an
@@ -24,6 +25,7 @@ app = FastAPI(
 )
 
 app.include_router(webhook_router)
+app.include_router(admin_router)
 
 
 @app.get("/healthz", tags=["ops"], summary="Liveness probe")
