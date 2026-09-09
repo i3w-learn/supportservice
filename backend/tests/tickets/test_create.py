@@ -17,6 +17,7 @@ from support_service.tickets.create import create_ticket
 WA_NUMBER = "919876500001"
 SERVICE_ID = "svc-electricity"
 CATEGORY_ID = "cat-outage"
+COUNTER_DATE = "20260909"
 
 
 def _draft(**overrides: object) -> Draft:
@@ -45,6 +46,7 @@ def db():
     for collection, doc_id in [
         ("services", SERVICE_ID),
         ("contacts", WA_NUMBER),
+        ("counters", COUNTER_DATE),
     ]:
         database.collection(collection).document(doc_id).delete()
     for ticket in database.collection("tickets").where("waNumber", "==", WA_NUMBER).stream():
