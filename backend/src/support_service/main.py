@@ -29,7 +29,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://ai-powered-479515.web.app"],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://ai-powered-479515.web.app",
+        "https://ai-powered-479515.firebaseapp.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

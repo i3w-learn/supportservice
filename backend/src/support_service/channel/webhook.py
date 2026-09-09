@@ -66,6 +66,8 @@ def receipt(body: dict[str, Any], secret: str | None = Query(None)) -> Response:
 
     if provider_status == ProviderStatus.DELIVERED:
         _try_close_on_delivery(gs_id)
+    elif provider_status == ProviderStatus.FAILED:
+        _mark_resolution_failed(gs_id)
 
     return Response(status_code=200)
 
@@ -147,3 +149,49 @@ def _try_close_on_delivery(gs_id: str) -> None:
                     "updatedAt": now,
                 }
             )
+
+
+def _mark_resolution_failed(gs_id: str) -> None:
+    db = get_db()
+    now = datetime.now(UTC)
+
+    results = db.collection_group("messages").where("messageId", "==", gs_id).limit(1).get()
+    if not results:
+        return
+
+    msg_data = results[0].to_dict()
+    ticket_id = msg_data.get("ticketId")
+    if not ticket_id:
+        return
+
+    ticket_ref = db.collection("tickets").document(ticket_id)
+    ticket_snap = ticket_ref.get()
+    if not ticket_snap.exists:
+        return
+
+    ticket_data = ticket_snap.to_dict()
+    if ticket_data.get("status") != TicketStatus.RESOLVED:
+        return
+
+    ticket_ref.update(
+        to_firestore(
+            {
+                "updated_at": now,
+                "resolution.delivery_state": ProviderStatus.FAILED,
+            }
+        )
+    )
+
+    ticket_ref.collection("events").document().set(
+        to_firestore(
+            {
+                "type": EventType.NOTE,
+                "from": None,
+                "to": None,
+                "actor": "system",
+                "actor_uid": None,
+                "note": "Delivery of resolution failed",
+                "at": now,
+            }
+        )
+    )

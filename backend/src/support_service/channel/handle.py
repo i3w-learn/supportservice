@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from ulid import ULID
@@ -95,6 +95,7 @@ def handle_inbound(raw: dict[str, Any]) -> None:
     elif isinstance(decision, AppendToTicket):
         _stamp_message(db, message, decision.ticket_id)
         _log_event(db, decision.ticket_id, EventType.MESSAGE_ADDED, now)
+        db.collection("tickets").document(decision.ticket_id).update({"lastInboundAt": now})
         text = config.text("appended", language).format(ticket_id=decision.ticket_id)
         _send_and_log(db, message.wa_number, text, decision.ticket_id, now)
 
@@ -127,7 +128,12 @@ def _is_duplicate(db: Any, provider_message_id: str) -> bool:
     ref = db.collection("inbound").document(provider_message_id)
     if ref.get().exists:
         return True
-    ref.set({"receivedAt": datetime.now(UTC)})
+    ref.set(
+        {
+            "receivedAt": datetime.now(UTC),
+            "expiresAt": datetime.now(UTC) + timedelta(days=7),
+        }
+    )
     return False
 
 
@@ -335,7 +341,9 @@ def _reopen(db: Any, ticket_id: str, wa_number: str, now: datetime) -> None:
             },
         )
 
-        ticket_ref.collection("events").document().set(
+        event_ref = ticket_ref.collection("events").document()
+        txn.set(
+            event_ref,
             to_firestore(
                 {
                     "type": EventType.STATUS_CHANGED,
@@ -346,7 +354,7 @@ def _reopen(db: Any, ticket_id: str, wa_number: str, now: datetime) -> None:
                     "note": "Reopened by contact",
                     "at": now,
                 }
-            )
+            ),
         )
 
     _txn(db.transaction())

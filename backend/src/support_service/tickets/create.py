@@ -67,6 +67,7 @@ def create_ticket(draft: Draft, wa_number: str, *, now: datetime | None = None) 
                 "first_response_at": None,
                 "resolved_at": None,
                 "closed_at": None,
+                "last_inbound_at": now,
             }
         )
 
