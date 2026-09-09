@@ -272,8 +272,35 @@ class TestResendResolution:
         ticket_ref.collection.return_value.document.return_value.set.assert_called_once()
 
 
+class TestAttachmentUrl:
+    """Mounted at /attachments, not /tickets/attachments — matches the
+    dashboard's api.getAttachmentUrl(), which calls the bare path."""
+
+    def test_found_returns_url(self, client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            admin_routes, "get_signed_url", lambda message_id: "https://signed.example"
+        )
+
+        response = client.get("/attachments/wamid.abc/url")
+
+        assert response.status_code == 200
+        assert response.json() == {"url": "https://signed.example"}
+
+    def test_missing_returns_404(self, client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(admin_routes, "get_signed_url", lambda message_id: None)
+
+        response = client.get("/attachments/wamid.abc/url")
+
+        assert response.status_code == 404
+
+
 class TestAuth:
     def test_missing_token_returns_401(self) -> None:
         response = TestClient(app).patch(f"/tickets/{TICKET_ID}/status", json={"to": "in_progress"})
+
+        assert response.status_code == 401
+
+    def test_missing_token_returns_401_for_attachment_url(self) -> None:
+        response = TestClient(app).get("/attachments/wamid.abc/url")
 
         assert response.status_code == 401

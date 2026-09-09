@@ -60,6 +60,7 @@ def normalize(raw: dict[str, Any]) -> InboundMessage:
         attachment = Attachment(
             state=AttachmentState.PENDING,
             mime_type=inner.get("mimeType") or _MIME_GUESS.get(gupshup_type),
+            media_id=inner.get("mediaId"),
         )
 
     context = payload.get("context")

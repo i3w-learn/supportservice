@@ -20,16 +20,23 @@ from support_service.models import EventType, ProviderStatus, TicketStatus
 
 TICKET_ID = "TKT-20260909-0001"
 WA_NUMBER = "919876543210"
+TEST_SECRET = "test-secret"
 
 
 @pytest.fixture(autouse=True)
-def _no_webhook_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+def _clean_webhook_secret_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Deterministic starting point regardless of the developer's shell env.
+    # TestSecretCheck below sets WEBHOOK_SECRET explicitly per test.
     monkeypatch.delenv("WEBHOOK_SECRET", raising=False)
 
 
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(webhook_module, "handle_inbound", MagicMock())
+    # These tests exercise dispatch/receipt logic, not the secret check
+    # itself (see TestSecretCheck) — bypass it so a real secret doesn't need
+    # to be threaded through every request.
+    monkeypatch.setattr(webhook_module, "_check_secret", lambda secret: True)
     return TestClient(app)
 
 
@@ -67,6 +74,25 @@ class TestSecretCheck:
         )
 
         assert response.status_code == 401
+
+    def test_no_secret_configured_fails_closed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("WEBHOOK_SECRET", raising=False)
+        client = TestClient(app)
+
+        response = client.post("/webhook/gupshup", json={"type": "message"})
+
+        assert response.status_code == 401
+
+    def test_correct_secret_is_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(webhook_module, "handle_inbound", MagicMock())
+        monkeypatch.setenv("WEBHOOK_SECRET", "correct-secret")
+        client = TestClient(app)
+
+        response = client.post(
+            "/webhook/gupshup", json={"type": "message-event"}, params={"secret": "correct-secret"}
+        )
+
+        assert response.status_code == 200
 
 
 class TestInboundDispatch:

@@ -9,12 +9,17 @@ from pydantic import BaseModel
 
 from support_service.admin_api.auth import get_admin_uid
 from support_service.firestore import get_db, get_doc, to_firestore, update_doc
+from support_service.media.urls import get_signed_url
 from support_service.models import EventType, TicketStatus
 from support_service.tickets.resolution import resend_resolution as resend_ticket_resolution
 from support_service.tickets.resolution import resolve_ticket
 from support_service.tickets.transitions import validate_transition
 
 router = APIRouter(prefix="/tickets", tags=["admin"], dependencies=[Depends(get_admin_uid)])
+
+# Not ticket-scoped, so it gets its own router rather than the /tickets prefix
+# above — the dashboard's api.getAttachmentUrl() calls this path directly.
+attachment_router = APIRouter(tags=["admin"], dependencies=[Depends(get_admin_uid)])
 
 
 class StatusBody(BaseModel):
@@ -129,3 +134,11 @@ def resend_resolution(ticket_id: str, uid: str = Depends(get_admin_uid)) -> dict
     except Exception as exc:
         raise HTTPException(502, "Send failed") from exc
     return {"status": "ok", "messageId": message_id}
+
+
+@attachment_router.get("/attachments/{message_id}/url")
+def attachment_url(message_id: str, admin: str = Depends(get_admin_uid)) -> dict:
+    url = get_signed_url(message_id)
+    if not url:
+        raise HTTPException(status_code=404, detail="Attachment not found or not yet stored")
+    return {"url": url}

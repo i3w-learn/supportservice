@@ -6,7 +6,9 @@ Module routers get mounted here as they are built (§3, §9).
 import os
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from support_service.admin_api.routes import attachment_router
 from support_service.admin_api.routes import router as admin_router
 from support_service.channel import webhook_router
 from support_service.jobs.routes import router as jobs_router
@@ -25,8 +27,17 @@ app = FastAPI(
     openapi_url="/openapi.json" if _IS_DEV else None,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "https://ai-powered-479515.web.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(webhook_router)
 app.include_router(admin_router)
+app.include_router(attachment_router)
 app.include_router(jobs_router)
 
 

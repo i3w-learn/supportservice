@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 from datetime import UTC, datetime
 from typing import Any
@@ -18,8 +19,10 @@ router = APIRouter(prefix="/webhook", tags=["webhook"])
 def _check_secret(secret: str | None) -> bool:
     expected = os.environ.get("WEBHOOK_SECRET", "")
     if not expected:
-        return True
-    return secret == expected
+        return False  # fail-closed: no secret configured = reject
+    if not secret:
+        return False
+    return hmac.compare_digest(secret, expected)
 
 
 @router.post("/gupshup")

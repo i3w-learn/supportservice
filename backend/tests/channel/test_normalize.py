@@ -91,6 +91,7 @@ def test_image_message() -> None:
     assert msg.attachment is not None
     assert msg.attachment.state == AttachmentState.PENDING
     assert msg.attachment.mime_type == "image/jpeg"
+    assert msg.attachment.media_id == "76534618"
 
 
 def test_reply_context() -> None:
