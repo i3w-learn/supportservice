@@ -42,10 +42,10 @@ test:
       FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
       uv run pytest
 
-check: lint types test
+check: lint types test dash-types dash-test
 
 # Fast pre-commit gate — no emulator needed.
-check-fast: lint types test-unit
+check-fast: lint types test-unit dash-types dash-test
 
 build:
     cd backend && docker build -t support-service .
@@ -80,6 +80,13 @@ dash:
 
 dash-build:
     cd frontend && pnpm build
+
+# Frontend unit tests — the §8 transition table and the 24-hour window rule.
+dash-test:
+    cd frontend && pnpm test
+
+dash-types:
+    cd frontend && npx tsc --noEmit -p tsconfig.app.json
 
 # --- deploy ---
 

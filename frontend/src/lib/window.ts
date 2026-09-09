@@ -34,12 +34,13 @@ export function formatCountdown(ms: number): string {
 }
 
 export function relativeTime(ts: number, now = Date.now()): string {
-  const mins = Math.round((now - ts) / 60_000)
+  // Floor, not round — 30 seconds ago is "just now", not "1m ago".
+  const mins = Math.floor((now - ts) / 60_000)
   if (mins < 1) return "just now"
   if (mins < 60) return `${mins}m ago`
-  const hrs = Math.round(mins / 60)
+  const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h ago`
-  return `${Math.round(hrs / 24)}d ago`
+  return `${Math.floor(hrs / 24)}d ago`
 }
 
 export function clockTime(ts: number): string {

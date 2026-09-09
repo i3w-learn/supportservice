@@ -3,6 +3,7 @@ import { ChevronRight, Loader2, LogOut } from "lucide-react"
 
 import { Board } from "@/components/board"
 import { Login } from "@/components/login"
+import { NotAuthorised } from "@/components/not-authorised"
 import { Sidebar, needsAttention } from "@/components/sidebar"
 import type { ViewKey } from "@/components/sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -27,7 +28,7 @@ import type { ServiceId, Ticket, TicketStatus } from "@/lib/types"
 import { replyWindow } from "@/lib/window"
 
 export default function App() {
-  const { user, loading, signOutNow } = useAuth()
+  const { user, loading, accessDenied, signOutNow } = useAuth()
   const [tickets, setTickets] = useState<Ticket[]>(MOCK_TICKETS)
   const [service, setService] = useState<ServiceId | "all">("all")
   const [view, setView] = useState<ViewKey>("all")
@@ -253,6 +254,7 @@ export default function App() {
   }
 
   if (!user) return <Login />
+  if (accessDenied) return <NotAuthorised />
 
   return (
     <TooltipProvider delayDuration={300}>

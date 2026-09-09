@@ -16,6 +16,13 @@ interface AuthContextValue {
   error: string | null
   /** True when Firebase is not configured and we are running on mock data. */
   demo: boolean
+  /**
+   * Set when Firestore refuses our reads. Signing in proves identity; the
+   * rules decide access by checking `admins/{uid}` (§9). Call `denyAccess`
+   * from a listener's error handler on `permission-denied`.
+   */
+  accessDenied: boolean
+  denyAccess: () => void
   signIn: () => Promise<void>
   signOutNow: () => Promise<void>
 }
@@ -35,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [accessDenied, setAccessDenied] = useState(false)
 
   useEffect(() => {
     if (demo) {
@@ -48,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return onAuthStateChanged(auth!, (firebaseUser) => {
+      setAccessDenied(false)
       setUser(
         firebaseUser
           ? {
@@ -61,8 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [demo])
 
+  const denyAccess = useCallback(() => setAccessDenied(true), [])
+
   const signIn = useCallback(async () => {
     setError(null)
+    setAccessDenied(false)
 
     if (demo) {
       try {
@@ -92,14 +104,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // nothing to clear
       }
       setUser(null)
+      setAccessDenied(false)
       return
     }
     await signOut(auth!)
   }, [demo])
 
   const value = useMemo(
-    () => ({ user, loading, error, demo, signIn, signOutNow }),
-    [user, loading, error, demo, signIn, signOutNow],
+    () => ({ user, loading, error, demo, accessDenied, denyAccess, signIn, signOutNow }),
+    [user, loading, error, demo, accessDenied, denyAccess, signIn, signOutNow],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
