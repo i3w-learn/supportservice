@@ -28,7 +28,7 @@ def fetch_pending_media() -> int:
 
     fetched = 0
     api_key = os.environ.get("GUPSHUP_API_KEY", "")
-    app_id = os.environ.get("GUPSHUP_APP_ID", "")
+    app_id = os.environ.get("GUPSHUP_APP_NAME", "")
 
     for doc in pending:
         data = doc.to_dict()
