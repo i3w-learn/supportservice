@@ -39,6 +39,7 @@ export function Board({ tickets, onOpen, onMove }: Props) {
 
   return (
     <div className="flex h-full gap-3 overflow-x-auto px-6 pb-6">
+      {/* Columns grow to share the width, so a wide screen has no dead strip. */}
       {COLUMNS.map((column) => (
         <Column
           key={column.status}
@@ -85,7 +86,11 @@ function Column({
     <section
       ref={ref}
       className={cn(
-        "flex w-72 shrink-0 flex-col rounded-md bg-neutral-100 transition-colors dark:bg-neutral-900",
+        "flex min-w-64 max-w-[26rem] flex-1 flex-col rounded-md transition-colors",
+        // Not `neutral-900` in dark: that is the same value as `card`, so the
+        // cards would disappear into the column. Lift the column off the page
+        // ground just enough to read as a well, and let the card sit above it.
+        "bg-neutral-100 dark:bg-white/[0.035]",
         over && "bg-primary/10 ring-1 ring-primary/30",
       )}
     >
@@ -93,13 +98,13 @@ function Column({
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </h2>
-        <span className="font-mono text-[11px] tabular-nums text-muted-foreground/70">
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
           {tickets.length}
         </span>
       </header>
 
       {hint && (
-        <p className="px-3 pb-1 text-[11px] leading-snug text-muted-foreground/60">{hint}</p>
+        <p className="px-3 pb-1 text-[11px] leading-snug text-muted-foreground/80">{hint}</p>
       )}
 
       <div className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">

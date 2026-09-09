@@ -48,7 +48,7 @@ export function Sidebar({ tickets, view, service, onView, onService }: Props) {
               aria-pressed={active}
               className={cn(
                 "h-8 justify-start gap-2 px-2 font-normal",
-                active && "bg-accent font-medium text-accent-foreground",
+                active && "bg-accent font-medium text-accent-foreground dark:bg-white/[0.08]",
               )}
             >
               <Icon
@@ -89,7 +89,7 @@ export function Sidebar({ tickets, view, service, onView, onService }: Props) {
               aria-pressed={active}
               className={cn(
                 "h-8 justify-start gap-2 px-2 font-normal",
-                active && "bg-accent font-medium text-accent-foreground",
+                active && "bg-accent font-medium text-accent-foreground dark:bg-white/[0.08]",
               )}
             >
               <span

@@ -54,8 +54,9 @@ export function TicketCard({
         }
       }}
       className={cn(
-        "group cursor-pointer rounded border border-transparent bg-card px-3 py-2.5 text-left shadow-xs transition-shadow",
-        "hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        "group cursor-pointer rounded border bg-card px-3 py-2.5 text-left shadow-xs transition-shadow",
+        "border-transparent dark:border-white/10 dark:bg-neutral-800/70",
+        "hover:shadow-md dark:hover:border-white/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         dragging && "opacity-40",
       )}
     >

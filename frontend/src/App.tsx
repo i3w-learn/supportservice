@@ -258,7 +258,7 @@ export default function App() {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex h-screen flex-col bg-background text-foreground">
+      <div className="flex h-dvh flex-col bg-background text-foreground">
         <header className="shrink-0 border-b px-5 py-3">
           <nav className="flex items-center gap-1 text-xs text-muted-foreground">
             <span>i3w.ai</span>

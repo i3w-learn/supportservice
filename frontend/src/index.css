@@ -128,3 +128,15 @@
     @apply font-sans;
     }
 }
+
+@layer base {
+  /* The app div fills the viewport, but the page ground behind it must be
+     the same token colour or a band shows below it on tall windows. */
+  html,
+  body,
+  #root {
+    height: 100%;
+    background: var(--background);
+    color: var(--foreground);
+  }
+}
