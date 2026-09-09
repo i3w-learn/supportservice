@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from support_service.admin_api.auth import get_admin_uid
 from support_service.firestore import get_db, get_doc, to_firestore, update_doc
 from support_service.models import EventType, TicketStatus
+from support_service.tickets.resolution import resend_resolution as resend_ticket_resolution
 from support_service.tickets.resolution import resolve_ticket
 from support_service.tickets.transitions import validate_transition
 
@@ -122,7 +123,7 @@ def resend_resolution(ticket_id: str, uid: str = Depends(get_admin_uid)) -> dict
         raise HTTPException(409, "Delivery did not fail")
 
     try:
-        message_id = resolve_ticket(ticket_id, resolution["text"], uid)
+        message_id = resend_ticket_resolution(ticket_id, uid)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
     except Exception as exc:

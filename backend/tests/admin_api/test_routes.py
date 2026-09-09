@@ -9,6 +9,7 @@ never touch a real token or the `admins` allowlist. Firestore access
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -19,6 +20,7 @@ from support_service.admin_api import routes as admin_routes
 from support_service.admin_api.auth import get_admin_uid
 from support_service.main import app
 from support_service.models import TicketStatus
+from support_service.tickets import resolution as resolution_module
 
 ADMIN_UID = "admin-uid-1"
 TICKET_ID = "TKT-20260909-0001"
@@ -210,20 +212,64 @@ class TestResendResolution:
         assert response.status_code == 409
         assert response.json()["detail"] == "Delivery did not fail"
 
-    def test_success_resends_and_returns_message_id(
+    def test_success_resends_via_real_function(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Exercises the real `resend_resolution` (tickets/resolution.py), not
+        a mock standing in for it — this is what would have caught the
+        RESOLVED -> RESOLVED validate_transition bug: a mocked-away
+        `resolve_ticket` always returns 200 regardless of what the real
+        function does.
+        """
+        wa_number = "919876500001"
         ticket = _ticket(
             status=TicketStatus.RESOLVED,
-            resolution={"text": "Fixed it", "delivery_state": "failed"},
+            wa_number=wa_number,
+            resolution={"text": "Fixed it", "delivery_state": "failed", "attempts": 1},
         )
-        monkeypatch.setattr(admin_routes, "get_doc", lambda *a, **kw: ticket)
-        monkeypatch.setattr(admin_routes, "resolve_ticket", lambda *a, **kw: "gs-msg-2")
+        contact = {"last_inbound_at": datetime.now(UTC)}  # inside the 24h window
+
+        def _get_doc(collection: str, doc_id: str) -> dict[str, Any] | None:
+            if collection == "tickets":
+                return ticket
+            if collection == "contacts":
+                return contact
+            raise AssertionError(f"unexpected collection {collection}")
+
+        # `admin_routes.get_doc` gates the endpoint's own 404/409 checks;
+        # `resolution_module.get_doc` is what the real resend_resolution
+        # uses internally when it re-reads the ticket and contact.
+        monkeypatch.setattr(admin_routes, "get_doc", _get_doc)
+        monkeypatch.setattr(resolution_module, "get_doc", _get_doc)
+
+        mock_db = MagicMock()
+        monkeypatch.setattr(resolution_module, "get_db", lambda: mock_db)
+
+        sent: dict[str, str] = {}
+
+        def _send_text(to: str, text: str) -> str:
+            sent["to"] = to
+            sent["text"] = text
+            return "gs-msg-2"
+
+        monkeypatch.setattr(resolution_module, "send_text", _send_text)
 
         response = client.post(f"/tickets/{TICKET_ID}/resend")
 
         assert response.status_code == 200
         assert response.json() == {"status": "ok", "messageId": "gs-msg-2"}
+        assert sent == {"to": wa_number, "text": "Fixed it"}
+
+        # No status-transition attempt: the fix's whole point is that this
+        # path never calls validate_transition(RESOLVED, RESOLVED). Instead
+        # it writes the resolution straight back to "queued" with attempts
+        # incremented.
+        ticket_ref = mock_db.collection.return_value.document.return_value
+        ticket_ref.update.assert_called_once()
+        (updates,) = ticket_ref.update.call_args.args
+        assert updates["resolution"]["deliveryState"] == "queued"
+        assert updates["resolution"]["attempts"] == 2
+        ticket_ref.collection.return_value.document.return_value.set.assert_called_once()
 
 
 class TestAuth:
