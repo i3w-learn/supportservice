@@ -1,7 +1,7 @@
 """Write seed data to Firestore. Run once at setup, idempotent."""
 
 from support_service.config.defaults import COPY, SERVICES, seed
-from support_service.firestore import get_db, to_firestore
+from support_service.repositories.base import get_db, to_firestore
 
 
 def run_seed() -> None:

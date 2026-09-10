@@ -8,10 +8,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from support_service.admin_api.routes import attachment_router
-from support_service.admin_api.routes import router as admin_router
-from support_service.channel import webhook_router
-from support_service.jobs.routes import router as jobs_router
+from support_service.controllers import admin_router, attachment_router, jobs_router, webhook_router
 
 # Interactive docs are a local-dev convenience. In production this is an
 # admin-only service behind Firebase Auth — it should not advertise its
