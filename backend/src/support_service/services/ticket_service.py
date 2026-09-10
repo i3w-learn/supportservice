@@ -130,7 +130,11 @@ def create_ticket(draft: Draft, wa_number: str, *, now: datetime | None = None) 
 # `channel_service.send_text` / `send_template` below. See module docstring.
 from support_service.services.channel_service import send_template, send_text  # noqa: E402
 
-TEMPLATE_NAME = "resolution_notification"
+TEMPLATE_NAMES: dict[str, str] = {
+    "en": "i3w_b2g_support_bot_en",
+    "hi": "i3w_b2g_support_bot_hi",
+}
+DEFAULT_TEMPLATE = "i3w_b2g_support_bot_en"
 
 
 # --- resolution — send and manage the resolved/closed lifecycle (§4.3) ----
@@ -159,7 +163,8 @@ def resolve_ticket(ticket_id: str, text: str, actor_uid: str) -> str:
         language = ticket.get("language", "en")
         contact_name = ticket.get("contact_name", "")
         params = [contact_name, ticket_id, text]
-        message_id = send_template(wa_number, TEMPLATE_NAME, language, params)
+        template = TEMPLATE_NAMES.get(language, DEFAULT_TEMPLATE)
+        message_id = send_template(wa_number, template, language, params)
         sent_via = "template"
 
     db = get_db()
@@ -233,7 +238,8 @@ def resend_resolution(ticket_id: str, actor_uid: str) -> str:
         language = ticket.get("language", "en")
         contact_name = ticket.get("contact_name", "")
         params = [contact_name, ticket_id, text]
-        message_id = send_template(wa_number, TEMPLATE_NAME, language, params)
+        template = TEMPLATE_NAMES.get(language, DEFAULT_TEMPLATE)
+        message_id = send_template(wa_number, template, language, params)
         sent_via = "template"
 
     db = get_db()
