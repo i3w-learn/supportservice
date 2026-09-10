@@ -1,0 +1,63 @@
+"""Firestore access. One place for the camelCase boundary and the db client.
+
+Generic, entity-agnostic helpers only. Domain-specific queries live in the
+sibling `ticket_repository.py`, `contact_repository.py`, `message_repository.py`.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from typing import Any
+
+import firebase_admin
+from firebase_admin import firestore
+
+_app: firebase_admin.App | None = None
+
+
+def get_db() -> firestore.firestore.Client:
+    global _app
+    if _app is None:
+        _app = firebase_admin.initialize_app()
+    db_name = os.environ.get("FIRESTORE_DATABASE", "whatsapp-support-service")
+    return firestore.client(_app, database_id=db_name)
+
+
+def _to_camel(name: str) -> str:
+    parts = name.split("_")
+    return parts[0] + "".join(p.capitalize() for p in parts[1:])
+
+
+def _to_snake(name: str) -> str:
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name).lower()
+
+
+def _convert_keys(data: Any, fn: Any) -> Any:
+    if isinstance(data, dict):
+        return {fn(k): _convert_keys(v, fn) for k, v in data.items()}
+    if isinstance(data, list):
+        return [_convert_keys(item, fn) for item in data]
+    return data
+
+
+def to_firestore(data: dict[str, Any]) -> dict[str, Any]:
+    return _convert_keys(data, _to_camel)
+
+
+def from_firestore(data: dict[str, Any]) -> dict[str, Any]:
+    return _convert_keys(data, _to_snake)
+
+
+def get_doc(collection: str, doc_id: str) -> dict[str, Any] | None:
+    doc = get_db().collection(collection).document(doc_id).get()
+    data = doc.to_dict()
+    return from_firestore(data) if data is not None else None
+
+
+def set_doc(collection: str, doc_id: str, data: dict[str, Any]) -> None:
+    get_db().collection(collection).document(doc_id).set(to_firestore(data))
+
+
+def update_doc(collection: str, doc_id: str, data: dict[str, Any]) -> None:
+    get_db().collection(collection).document(doc_id).update(to_firestore(data))

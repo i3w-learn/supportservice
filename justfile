@@ -50,6 +50,9 @@ check-fast: lint types test-unit dash-types dash-test
 build:
     cd backend && docker build -t support-service .
 
+seed:
+    cd backend && uv run python -m support_service.seed
+
 # --- emulators ---
 
 # Java 21+ only — the Firestore emulator is a JVM program. brew installs

@@ -78,8 +78,9 @@ export interface Ticket {
   closedAt: number | null
   /** Load-bearing: decides free text vs approved template (§5). */
   lastInboundAt: number
-  messages: Message[]
-  events: TicketEvent[]
+  /** Optional: these live in subcollections and are hydrated separately. */
+  messages?: Message[]
+  events?: TicketEvent[]
 }
 
 export const SERVICES: Record<ServiceId, { name: string; color: string }> = {

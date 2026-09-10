@@ -21,21 +21,34 @@ import {
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import { MOCK_TICKETS, nextId } from "@/lib/mock"
+import { useTicketDetail, useTickets } from "@/lib/firestore"
+import { nextId } from "@/lib/mock"
 import { checkTransition } from "@/lib/transitions"
 import type { ServiceId, Ticket, TicketStatus } from "@/lib/types"
 import { replyWindow } from "@/lib/window"
 
 export default function App() {
-  const { user, loading, accessDenied, signOutNow } = useAuth()
-  const [tickets, setTickets] = useState<Ticket[]>(MOCK_TICKETS)
+  const { user, loading, accessDenied, signOutNow, demo } = useAuth()
+  const { tickets: liveTickets } = useTickets()
+
+  // Demo mode simulates writes locally (no backend to call). Once Firebase is
+  // configured, `tickets` tracks the live Firestore listener instead, and
+  // writes go through the REST API with an optimistic patch on top.
+  const [tickets, setTickets] = useState<Ticket[]>(liveTickets)
+  useEffect(() => {
+    if (!demo) setTickets(liveTickets)
+  }, [demo, liveTickets])
+
   const [service, setService] = useState<ServiceId | "all">("all")
   const [view, setView] = useState<ViewKey>("all")
   const [query, setQuery] = useState("")
   const [openId, setOpenId] = useState<string | null>(null)
   const [composeOnOpen, setComposeOnOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+
+  const { messages, events } = useTicketDetail(demo ? null : openId)
 
   const say = useCallback((message: string) => {
     setToast(message)
@@ -54,7 +67,17 @@ export default function App() {
     })
   }, [tickets, service, view, query])
 
-  const selected = tickets.find((t) => t.ticketId === openId) ?? null
+  const selectedTicket = tickets.find((t) => t.ticketId === openId) ?? null
+  // In live mode the ticket doc itself carries no messages/events — those
+  // come from the subcollection listeners in `useTicketDetail`.
+  const selected: Ticket | null = selectedTicket
+    ? {
+        ...selectedTicket,
+        messages: demo ? (selectedTicket.messages ?? []) : messages,
+        events: demo ? (selectedTicket.events ?? []) : events,
+      }
+    : null
+
   const alerts = tickets.filter(
     (t) => t.slaState !== "ok" || t.resolution?.deliveryState === "failed",
   ).length
@@ -65,26 +88,50 @@ export default function App() {
 
   const changeStatus = useCallback(
     (id: string, to: TicketStatus, from: TicketStatus) => {
+      if (demo) {
+        patch(id, (t) => ({
+          ...t,
+          status: to,
+          firstResponseAt: t.firstResponseAt ?? (to === "in_progress" ? Date.now() : null),
+          updatedAt: Date.now(),
+          events: [
+            ...(t.events ?? []),
+            {
+              eventId: nextId("e"),
+              type: "status_changed",
+              from,
+              to,
+              actor: "admin",
+              note: null,
+              at: Date.now(),
+            },
+          ],
+        }))
+        return
+      }
+
+      // Optimistic update kept for a snappy UI; rolled back if the API call fails.
+      const previous = tickets.find((t) => t.ticketId === id) ?? null
       patch(id, (t) => ({
         ...t,
         status: to,
         firstResponseAt: t.firstResponseAt ?? (to === "in_progress" ? Date.now() : null),
         updatedAt: Date.now(),
-        events: [
-          ...t.events,
-          {
-            eventId: nextId("e"),
-            type: "status_changed",
-            from,
-            to,
-            actor: "admin",
-            note: null,
-            at: Date.now(),
-          },
-        ],
       }))
+
+      api
+        .changeStatus(id, to)
+        .then((res) => {
+          if (res.ok) return
+          if (previous) patch(id, () => previous)
+          say("Could not change status — try again")
+        })
+        .catch(() => {
+          if (previous) patch(id, () => previous)
+          say("Could not change status — try again")
+        })
     },
-    [patch],
+    [demo, patch, say, tickets],
   )
 
   // Dragging a card is a status transition, so it obeys the same table the API
@@ -122,29 +169,38 @@ export default function App() {
   )
 
   const handleNote = useCallback(
-    (id: string) => {
-      patch(id, (t) => ({
-        ...t,
-        updatedAt: Date.now(),
-        events: [
-          ...t.events,
-          {
-            eventId: nextId("e"),
-            type: "note",
-            actor: "admin",
-            note: "Checked with the field coordinator",
-            at: Date.now(),
-          },
-        ],
-      }))
+    (id: string, text: string) => {
+      if (demo) {
+        patch(id, (t) => ({
+          ...t,
+          updatedAt: Date.now(),
+          events: [
+            ...(t.events ?? []),
+            {
+              eventId: nextId("e"),
+              type: "note",
+              actor: "admin",
+              note: text,
+              at: Date.now(),
+            },
+          ],
+        }))
+        say("Note added — never sent to the user")
+        return
+      }
+
       say("Note added — never sent to the user")
+      api.addNote(id, text).then((res) => {
+        if (!res.ok) say("Could not add note — try again")
+      })
     },
-    [patch, say],
+    [demo, patch, say],
   )
 
   // Resolve → send → delivery receipt → closed (§4.3). The admin never closes
-  // a ticket; the receipt does.
-  const dispatch = useCallback(
+  // a ticket; the receipt does. Demo-only: simulates what the backend and the
+  // Firestore listeners would otherwise do for real.
+  const dispatchDemo = useCallback(
     (id: string, text: string | null) => {
       const ticket = tickets.find((t) => t.ticketId === id)
       if (!ticket) return
@@ -164,7 +220,7 @@ export default function App() {
         },
         messages: text
           ? [
-              ...t.messages,
+              ...(t.messages ?? []),
               {
                 messageId: nextId("m"),
                 direction: "out",
@@ -176,11 +232,11 @@ export default function App() {
                 createdAt: at,
               },
             ]
-          : t.messages.map((m, i) =>
-              i === t.messages.length - 1 ? { ...m, providerStatus: "queued" as const } : m,
+          : (t.messages ?? []).map((m, i, all) =>
+              i === all.length - 1 ? { ...m, providerStatus: "queued" as const } : m,
             ),
         events: [
-          ...t.events,
+          ...(t.events ?? []),
           {
             eventId: nextId("e"),
             type: "resolution_sent",
@@ -197,8 +253,8 @@ export default function App() {
       const mark = (status: "sent" | "delivered") =>
         patch(id, (t) => ({
           ...t,
-          messages: t.messages.map((m, i) =>
-            i === t.messages.length - 1 ? { ...m, providerStatus: status } : m,
+          messages: (t.messages ?? []).map((m, i, all) =>
+            i === all.length - 1 ? { ...m, providerStatus: status } : m,
           ),
           resolution: t.resolution ? { ...t.resolution, deliveryState: status } : null,
           ...(status === "delivered"
@@ -208,7 +264,7 @@ export default function App() {
                 slaState: "ok" as const,
                 updatedAt: Date.now(),
                 events: [
-                  ...t.events,
+                  ...(t.events ?? []),
                   {
                     eventId: nextId("e"),
                     type: "delivered" as const,
@@ -230,12 +286,44 @@ export default function App() {
     [tickets, patch, say],
   )
 
-  // The 2-minute media cron landing a deferred attachment (§4.1 step 7).
+  const handleResolve = useCallback(
+    (id: string, text: string) => {
+      if (demo) {
+        dispatchDemo(id, text)
+        return
+      }
+
+      setComposeOnOpen(false)
+      say("Sending…")
+      api.resolve(id, text).then((res) => {
+        if (!res.ok) say("Could not send resolution — try again")
+      })
+    },
+    [demo, dispatchDemo, say],
+  )
+
+  const handleResend = useCallback(
+    (id: string) => {
+      if (demo) {
+        dispatchDemo(id, null)
+        return
+      }
+
+      say("Retrying…")
+      api.resend(id).then((res) => {
+        if (!res.ok) say("Could not resend — try again")
+      })
+    },
+    [demo, dispatchDemo, say],
+  )
+
+  // The 2-minute media cron landing a deferred attachment (§4.1 step 7). Demo only.
   useEffect(() => {
+    if (!demo) return
     const timer = setTimeout(() => {
       patch("TKT-20260908-0041", (t) => ({
         ...t,
-        messages: t.messages.map((m) =>
+        messages: (t.messages ?? []).map((m) =>
           m.attachment?.state === "pending"
             ? { ...m, attachment: { ...m.attachment, state: "stored", sizeBytes: 839_680 } }
             : m,
@@ -243,7 +331,7 @@ export default function App() {
       }))
     }, 7000)
     return () => clearTimeout(timer)
-  }, [patch])
+  }, [demo, patch])
 
   if (loading) {
     return (
@@ -352,8 +440,8 @@ export default function App() {
               startComposing={composeOnOpen}
               onTake={handleTake}
               onNote={handleNote}
-              onResolve={(id, text) => dispatch(id, text)}
-              onResend={(id) => dispatch(id, null)}
+              onResolve={handleResolve}
+              onResend={handleResend}
             />
           </SheetContent>
         </Sheet>

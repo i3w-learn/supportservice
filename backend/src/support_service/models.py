@@ -92,6 +92,7 @@ class Attachment(BaseModel):
     mime_type: str | None = None
     size_bytes: int | None = None
     attempts: int = 0
+    media_id: str | None = None
 
 
 class InboundMessage(BaseModel):
