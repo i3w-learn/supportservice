@@ -412,20 +412,22 @@ def _load_open_tickets(db: Any, contact: Contact) -> list[OpenTicket]:
 
 
 def _load_outbound_map(db: Any, wa_number: str) -> dict[str, str]:
-    outbound = (
-        db.collection("contacts")
-        .document(wa_number)
-        .collection("messages")
-        .where("direction", "==", "out")
-        .where("ticketId", "!=", None)
-        .order_by("createdAt", direction="DESCENDING")
-        .limit(20)
-        .get()
-    )
+    try:
+        outbound = (
+            db.collection("contacts")
+            .document(wa_number)
+            .collection("messages")
+            .where("direction", "==", "out")
+            .order_by("createdAt", direction="DESCENDING")
+            .limit(20)
+            .get()
+        )
+    except Exception:
+        return {}
     return {
         doc.to_dict().get("messageId", ""): doc.to_dict().get("ticketId", "")
         for doc in outbound
-        if doc.to_dict().get("messageId")
+        if doc.to_dict().get("messageId") and doc.to_dict().get("ticketId")
     }
 
 

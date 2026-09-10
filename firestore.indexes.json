@@ -58,6 +58,15 @@
       ]
     },
     {
+      "collectionGroup": "messages",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "direction", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "ticketId", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
