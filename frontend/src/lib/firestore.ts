@@ -5,14 +5,30 @@ import {
   onSnapshot,
   orderBy,
   query,
+  Timestamp,
   where,
 } from "firebase/firestore"
-import type { Unsubscribe } from "firebase/firestore"
+import type { QueryDocumentSnapshot, Unsubscribe } from "firebase/firestore"
 import { useEffect, useState } from "react"
 
 import { db, isFirebaseConfigured } from "@/firebase"
 import { MOCK_TICKETS } from "./mock"
 import type { Message, Ticket, TicketEvent } from "./types"
+
+// The backend writes datetimes, which Firestore hands back as Timestamp
+// objects. Everything downstream (types.ts, window.ts) works in epoch ms.
+function toPlain(value: unknown): unknown {
+  if (value instanceof Timestamp) return value.toMillis()
+  if (Array.isArray(value)) return value.map(toPlain)
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toPlain(v)]))
+  }
+  return value
+}
+
+function plainData(snap: QueryDocumentSnapshot): Record<string, unknown> {
+  return toPlain(snap.data()) as Record<string, unknown>
+}
 
 export function useTickets(): { tickets: Ticket[]; loading: boolean } {
   const [tickets, setTickets] = useState<Ticket[]>(isFirebaseConfigured ? [] : MOCK_TICKETS)
@@ -27,7 +43,7 @@ export function useTickets(): { tickets: Ticket[]; loading: boolean } {
       (snap) => {
         const docs = snap.docs.map((doc) => ({
           ticketId: doc.id,
-          ...doc.data(),
+          ...plainData(doc),
           messages: [],
           events: [],
         })) as unknown as Ticket[]
@@ -69,9 +85,15 @@ export function useTicketDetail(ticketId: string | null): {
       orderBy("createdAt", "asc"),
     )
     unsubs.push(
-      onSnapshot(msgQ, (snap) => {
-        setMessages(snap.docs.map((d) => ({ messageId: d.id, ...d.data() }) as Message))
-      }),
+      onSnapshot(
+        msgQ,
+        (snap) => {
+          setMessages(
+            snap.docs.map((d) => ({ messageId: d.id, ...plainData(d) }) as unknown as Message),
+          )
+        },
+        (err) => console.error("messages listener error:", err),
+      ),
     )
 
     // Events are under tickets/{ticketId}/events
@@ -80,9 +102,15 @@ export function useTicketDetail(ticketId: string | null): {
       orderBy("at", "asc"),
     )
     unsubs.push(
-      onSnapshot(evtQ, (snap) => {
-        setEvents(snap.docs.map((d) => ({ eventId: d.id, ...d.data() }) as TicketEvent))
-      }),
+      onSnapshot(
+        evtQ,
+        (snap) => {
+          setEvents(
+            snap.docs.map((d) => ({ eventId: d.id, ...plainData(d) }) as unknown as TicketEvent),
+          )
+        },
+        (err) => console.error("events listener error:", err),
+      ),
     )
 
     return () => unsubs.forEach((u) => u())

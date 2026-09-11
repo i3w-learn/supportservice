@@ -8,7 +8,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from support_service.controllers import admin_router, attachment_router, jobs_router, webhook_router
+from support_service.controllers import admin_router, attachment_router, auth_router, jobs_router, webhook_router
 
 # Interactive docs are a local-dev convenience. In production this is an
 # admin-only service behind Firebase Auth — it should not advertise its
@@ -30,12 +30,15 @@ app.add_middleware(
         "http://localhost:5173",
         "https://ai-powered-479515.web.app",
         "https://ai-powered-479515.firebaseapp.com",
+        "https://whatsapp-support-dashboard.web.app",
+        "https://whatsapp-support-dashboard.firebaseapp.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(webhook_router)
 app.include_router(admin_router)
 app.include_router(attachment_router)

@@ -38,6 +38,13 @@ service cloud.firestore {
       }
     }
 
+    // The ticket detail loads messages with a collection-group query across
+    // every contacts/*/messages subcollection; that needs its own rule.
+    match /{path=**}/messages/{messageId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /services/{serviceId} {
       allow read: if isAdmin();
       allow write: if false;

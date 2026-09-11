@@ -25,7 +25,7 @@ let dbInstance: Firestore | null = null
 if (isFirebaseConfigured) {
   app = initializeApp(config)
   authInstance = getAuth(app)
-  dbInstance = getFirestore(app)
+  dbInstance = getFirestore(app, "whatsapp-support-service")
 
   if (import.meta.env.VITE_USE_EMULATORS === "true") {
     connectAuthEmulator(authInstance, "http://localhost:9099", { disableWarnings: true })

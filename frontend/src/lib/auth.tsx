@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth"
+import { onAuthStateChanged, signInWithCustomToken, signOut } from "firebase/auth"
 
 import { auth, isFirebaseConfigured } from "@/firebase"
 
@@ -14,16 +14,10 @@ interface AuthContextValue {
   user: AdminUser | null
   loading: boolean
   error: string | null
-  /** True when Firebase is not configured and we are running on mock data. */
   demo: boolean
-  /**
-   * Set when Firestore refuses our reads. Signing in proves identity; the
-   * rules decide access by checking `admins/{uid}` (§9). Call `denyAccess`
-   * from a listener's error handler on `permission-denied`.
-   */
   accessDenied: boolean
   denyAccess: () => void
-  signIn: () => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
   signOutNow: () => Promise<void>
 }
 
@@ -36,6 +30,8 @@ const DEMO_USER: AdminUser = {
   email: "partnerships@i3w.ai",
   displayName: "Manas Singh",
 }
+
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:8088"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const demo = !isFirebaseConfigured
@@ -72,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const denyAccess = useCallback(() => setAccessDenied(true), [])
 
-  const signIn = useCallback(async () => {
+  const signIn = useCallback(async (email: string, password: string) => {
     setError(null)
     setAccessDenied(false)
 
@@ -87,12 +83,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await signInWithPopup(auth!, new GoogleAuthProvider())
-    } catch (caught) {
-      const code = (caught as { code?: string }).code ?? ""
-      // Closing the popup yourself is not an error worth showing.
-      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return
-      setError("Sign-in failed. Check that Google sign-in is enabled for this project.")
+      const res = await fetch(`${BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (!res.ok) {
+        setError("Invalid email or password")
+        return
+      }
+
+      const data = await res.json()
+      await signInWithCustomToken(auth!, data.token)
+    } catch {
+      setError("Sign-in failed. Please try again.")
     }
   }, [demo])
 
