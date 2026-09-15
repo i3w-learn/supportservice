@@ -11,7 +11,8 @@ from support_service.models import EventType, TicketStatus
 from support_service.repositories.base import get_db, get_doc, update_doc
 from support_service.repositories.ticket_repository import log_event as _log_ticket_event
 from support_service.services.auth_service import get_admin_uid
-from support_service.services.media_service import get_signed_url
+from support_service.services.contact_service import purge_contact
+from support_service.services.media_service import get_signed_url, requeue_attachment
 from support_service.services.ticket_service import resend_resolution as resend_ticket_resolution
 from support_service.services.ticket_service import resolve_ticket, validate_transition
 
@@ -20,6 +21,10 @@ router = APIRouter(prefix="/tickets", tags=["admin"], dependencies=[Depends(get_
 # Not ticket-scoped, so it gets its own router rather than the /tickets prefix
 # above — the dashboard's api.getAttachmentUrl() calls this path directly.
 attachment_router = APIRouter(tags=["admin"], dependencies=[Depends(get_admin_uid)])
+
+contact_router = APIRouter(
+    prefix="/contacts", tags=["admin"], dependencies=[Depends(get_admin_uid)]
+)
 
 
 class StatusBody(BaseModel):
@@ -142,3 +147,17 @@ def attachment_url(message_id: str, admin: str = Depends(get_admin_uid)) -> dict
     if not url:
         raise HTTPException(status_code=404, detail="Attachment not found or not yet stored")
     return {"url": url}
+
+
+@attachment_router.post("/attachments/{message_id}/retry")
+def retry_attachment(message_id: str) -> dict[str, str]:
+    if not requeue_attachment(message_id):
+        raise HTTPException(409, "Nothing to retry")
+    return {"status": "queued"}
+
+
+@contact_router.delete("/{wa_number}")
+def delete_contact(wa_number: str) -> dict:
+    if not wa_number.isdigit():
+        raise HTTPException(400, "wa_number must be digits only")
+    return {"status": "ok", "deleted": purge_contact(wa_number)}

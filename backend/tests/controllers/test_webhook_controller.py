@@ -9,6 +9,7 @@ the secret check and the delivery-receipt / auto-close flow that lives in
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -96,7 +97,7 @@ class TestSecretCheck:
 
 
 class TestInboundDispatch:
-    def test_non_message_events_are_ignored(self, client: TestClient) -> None:
+    def test_receipts_are_not_handed_to_the_orchestrator(self, client: TestClient) -> None:
         response = client.post("/webhook/gupshup", json={"type": "message-event"})
 
         assert response.status_code == 200
@@ -113,13 +114,13 @@ class TestInboundDispatch:
 
 class TestReceiptStatusUpdate:
     def test_non_status_events_are_ignored(self, client: TestClient, mock_db: MagicMock) -> None:
-        response = client.post("/webhook/gupshup/status", json={"type": "message"})
+        response = client.post("/webhook/gupshup", json={"type": "message"})
 
         assert response.status_code == 200
         mock_db.collection_group.assert_not_called()
 
     def test_unmapped_event_type_is_ignored(self, client: TestClient, mock_db: MagicMock) -> None:
-        response = client.post("/webhook/gupshup/status", json=_status_event("weird"))
+        response = client.post("/webhook/gupshup", json=_status_event("weird"))
 
         assert response.status_code == 200
         mock_db.collection_group.assert_not_called()
@@ -130,7 +131,7 @@ class TestReceiptStatusUpdate:
         doc = _message_doc(ticketId=None)
         _seed_message_query(mock_db, doc)
 
-        response = client.post("/webhook/gupshup/status", json=_status_event("sent", "gs-1"))
+        response = client.post("/webhook/gupshup", json=_status_event("sent", "gs-1"))
 
         assert response.status_code == 200
         mock_db.collection_group.assert_called_with("messages")
@@ -149,7 +150,7 @@ class TestDeliveryAutoClose:
     ) -> None:
         self._seed_message(mock_db, ticket_id=None)
 
-        response = client.post("/webhook/gupshup/status", json=_status_event("delivered"))
+        response = client.post("/webhook/gupshup", json=_status_event("delivered"))
 
         assert response.status_code == 200
         mock_db.collection("tickets").document.assert_not_called()
@@ -163,7 +164,7 @@ class TestDeliveryAutoClose:
         ticket_snapshot.to_dict.return_value = {"status": TicketStatus.OPEN.value}
         mock_db.collection("tickets").document.return_value.get.return_value = ticket_snapshot
 
-        response = client.post("/webhook/gupshup/status", json=_status_event("delivered"))
+        response = client.post("/webhook/gupshup", json=_status_event("delivered"))
 
         assert response.status_code == 200
         mock_db.collection("tickets").document.return_value.update.assert_not_called()
@@ -185,11 +186,17 @@ class TestDeliveryAutoClose:
         contact_snapshot.exists = True
         contact_snapshot.to_dict.return_value = {
             "openTicketIds": [TICKET_ID, "TKT-other"],
-            "recentlyClosed": [],
+            "recentlyClosed": [
+                {
+                    "ticketId": "TKT-stale",
+                    "serviceId": "poshan-ai",
+                    "closedAt": datetime.now(UTC) - timedelta(days=30),
+                }
+            ],
         }
         mock_db.collection("contacts").document.return_value.get.return_value = contact_snapshot
 
-        response = client.post("/webhook/gupshup/status", json=_status_event("delivered"))
+        response = client.post("/webhook/gupshup", json=_status_event("delivered"))
 
         assert response.status_code == 200
 
@@ -206,4 +213,5 @@ class TestDeliveryAutoClose:
         contact_ref = mock_db.collection("contacts").document.return_value
         contact_update = contact_ref.update.call_args.args[0]
         assert contact_update["openTicketIds"] == ["TKT-other"]
-        assert contact_update["recentlyClosed"][0]["ticketId"] == TICKET_ID
+        # The stale entry is past the reopen window and gets dropped.
+        assert [e["ticketId"] for e in contact_update["recentlyClosed"]] == [TICKET_ID]

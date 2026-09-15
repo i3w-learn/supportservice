@@ -71,12 +71,16 @@ def test_stored_attachment_returns_signed_url(
     mock_storage = MagicMock()
     mock_storage.bucket.return_value = mock_bucket
     monkeypatch.setattr(urls_module, "storage", mock_storage)
+    monkeypatch.setattr(urls_module, "_signer", lambda: ("sa@example.iam", "token-1"))
 
     url = get_signed_url(MESSAGE_ID)
 
     assert url == "https://storage.example/signed"
     mock_bucket.blob.assert_called_once_with("attachments/919876500001/wamid.abc")
-    mock_blob.generate_signed_url.assert_called_once()
+    # Cloud Run has no private key, so the URL must be signed through IAM.
+    kwargs = mock_blob.generate_signed_url.call_args.kwargs
+    assert kwargs["service_account_email"] == "sa@example.iam"
+    assert kwargs["access_token"] == "token-1"
 
 
 def test_query_filters_by_message_id(mock_db: MagicMock) -> None:

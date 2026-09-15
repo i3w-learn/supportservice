@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react"
-import { AlertTriangle, CheckCheck, Clock3, ImageIcon, Loader2, ShieldCheck } from "lucide-react"
+import {
+  AlertTriangle,
+  CheckCheck,
+  Clock3,
+  FileText,
+  Film,
+  ImageIcon,
+  Loader2,
+  ShieldCheck,
+} from "lucide-react"
 
 import { FailedLozenge, ServiceTag, SlaLozenge, StatusLozenge } from "@/components/lozenge"
 import { Button } from "@/components/ui/button"
@@ -7,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { api } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { LANGUAGES, SERVICES, TEMPLATES } from "@/lib/types"
 import type { Message, Ticket, TicketEvent } from "@/lib/types"
@@ -349,9 +359,81 @@ function DeliveryMark({ status }: { status: NonNullable<Message["providerStatus"
   )
 }
 
+// A healthy download lands in seconds; past this, offer a retry.
+const STUCK_AFTER_MS = 2 * 60_000
+
 function AttachmentCard({ message }: { message: Message }) {
   const att = message.attachment!
+  const mime = att.mimeType ?? ""
+  const kind = mime.startsWith("image/") ? "Photo" : mime.startsWith("video/") ? "Video" : "File"
+  const [url, setUrl] = useState<string | null>(null)
+  const [retry, setRetry] = useState<"idle" | "sent" | "error">("idle")
+  const [stuck, setStuck] = useState(false)
+
+  // Signed URLs are short-lived, so ask for one only once the file is in storage.
+  useEffect(() => {
+    if (att.state !== "stored") return
+    let live = true
+    api
+      .getAttachmentUrl(message.messageId)
+      .then((signed) => {
+        if (live) setUrl(signed)
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [att.state, message.messageId])
+
+  useEffect(() => {
+    if (att.state !== "pending") return
+    const wait = message.createdAt + STUCK_AFTER_MS - Date.now()
+    const timer = setTimeout(() => setStuck(true), Math.max(0, wait))
+    return () => clearTimeout(timer)
+  }, [att.state, message.createdAt])
+
+  if (url && kind !== "File") {
+    return (
+      <div className="flex flex-col gap-1.5">
+        {kind === "Photo" ? (
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="w-fit overflow-hidden rounded-lg border"
+          >
+            <img
+              src={url}
+              alt={message.text ?? "Photo sent by the user"}
+              className="max-h-72 max-w-full object-contain"
+            />
+          </a>
+        ) : (
+          <video
+            src={url}
+            controls
+            preload="metadata"
+            className="max-h-72 max-w-full rounded-lg border"
+          />
+        )}
+        {message.text && <p className="text-sm leading-relaxed">{message.text}</p>}
+      </div>
+    )
+  }
+
   const pending = att.state === "pending"
+  const failed = att.state === "failed"
+  const Icon = kind === "Video" ? Film : kind === "File" ? FileText : ImageIcon
+
+  const handleRetry = () => {
+    setRetry("sent")
+    api
+      .retryAttachment(message.messageId)
+      .then((res) => {
+        if (!res.ok) setRetry("error")
+      })
+      .catch(() => setRetry("error"))
+  }
 
   return (
     <div className="flex max-w-80 items-center gap-2.5 rounded-lg border bg-card p-2">
@@ -360,23 +442,49 @@ function AttachmentCard({ message }: { message: Message }) {
           "grid size-13 shrink-0 place-items-center rounded-md border",
           pending
             ? "animate-pulse bg-muted text-muted-foreground"
-            : "border-transparent bg-gradient-to-br from-slate-500 via-emerald-700 to-amber-700 text-white/90",
+            : failed
+              ? "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400"
+              : "border-transparent bg-gradient-to-br from-slate-500 via-emerald-700 to-amber-700 text-white/90",
         )}
       >
-        {pending ? <Clock3 className="size-5" /> : <ImageIcon className="size-5" />}
+        {pending ? <Clock3 className="size-5" /> : <Icon className="size-5" />}
       </div>
       <div className="flex min-w-0 flex-col">
-        <span className="truncate text-sm font-medium">Photo</span>
+        <span className="truncate text-sm font-medium">{message.text || kind}</span>
         <span
           className={cn(
             "font-mono text-[10px]",
-            pending ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground",
+            pending
+              ? "text-amber-600 dark:text-amber-400"
+              : failed
+                ? "text-red-600 dark:text-red-400"
+                : "text-muted-foreground",
           )}
         >
-          {pending
-            ? "still arriving…"
-            : `${Math.round((att.sizeBytes ?? 0) / 1024)} KB · signed URL, 15 min`}
+          {pending ? (
+            "still arriving…"
+          ) : failed ? (
+            "could not be saved"
+          ) : url ? (
+            <a href={url} target="_blank" rel="noreferrer" className="underline">
+              open file
+            </a>
+          ) : (
+            `${Math.round((att.sizeBytes ?? 0) / 1024)} KB`
+          )}
         </span>
+        {(failed || (pending && stuck)) && retry !== "sent" && (
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="w-fit text-xs font-medium text-primary hover:underline"
+          >
+            {retry === "error" ? "Retry failed — try again" : "Retry download"}
+          </button>
+        )}
+        {retry === "sent" && att.state !== "stored" && (
+          <span className="text-[10px] text-muted-foreground">retrying…</span>
+        )}
       </div>
     </div>
   )

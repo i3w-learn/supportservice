@@ -21,6 +21,7 @@ import httpx
 from ulid import ULID
 
 from support_service.config.defaults import seed
+from support_service.config.models import ConfigSnapshot
 from support_service.conversation.routing import (
     AppendToTicket,
     AskAboutRecentlyClosed,
@@ -31,6 +32,7 @@ from support_service.conversation.routing import (
     route,
 )
 from support_service.conversation.steps import (
+    Draft,
     Reply,
     Row,
     SendButtons,
@@ -38,6 +40,7 @@ from support_service.conversation.steps import (
     SendText,
     advance,
     begin,
+    finish_idle,
 )
 from support_service.models import (
     Attachment,
@@ -48,9 +51,12 @@ from support_service.models import (
     Language,
     MessageType,
     OpenTicket,
+    Session,
+    Step,
     TicketStatus,
 )
 from support_service.repositories.base import from_firestore, get_db, to_firestore
+from support_service.services import task_service
 
 # --- normalize: Gupshup payload -> InboundMessage --------------------------
 #
@@ -105,8 +111,8 @@ def normalize(raw: dict[str, Any]) -> InboundMessage:
         text = inner.get("caption")
         attachment = Attachment(
             state=AttachmentState.PENDING,
-            mime_type=inner.get("mimeType") or _MIME_GUESS.get(gupshup_type),
-            media_id=inner.get("mediaId"),
+            mime_type=inner.get("contentType") or _MIME_GUESS.get(gupshup_type),
+            media_url=inner.get("url"),
         )
 
     context = payload.get("context")
@@ -235,9 +241,41 @@ def send_reply(to: str, reply: Reply) -> str:
     raise ValueError(f"Unknown reply type: {type(reply)}")
 
 
-# `ticket_service` needs `send_text` / `send_template` above; this module
-# needs `ticket_service.create_ticket` below. See module docstring.
-from support_service.services.ticket_service import create_ticket  # noqa: E402
+def log_outbound(
+    db: Any,
+    wa_number: str,
+    message_id: str,
+    text: str | None,
+    now: datetime,
+    *,
+    ticket_id: str | None = None,
+    sent_via: str = "freeform",
+) -> None:
+    ulid = str(ULID())
+    db.collection("contacts").document(wa_number).collection("messages").document(ulid).set(
+        to_firestore(
+            {
+                "message_id": message_id or ulid,
+                "direction": "out",
+                "ticket_id": ticket_id,
+                "type": "text",
+                "text": text,
+                "sent_via": sent_via,
+                "provider_status": "queued",
+                "created_at": now,
+            }
+        )
+    )
+    db.collection("contacts").document(wa_number).update({"lastOutboundAt": now, "updatedAt": now})
+
+
+# `ticket_service` needs `send_text` / `send_template` / `log_outbound` above;
+# this module needs `ticket_service.create_ticket` / `schedule_sla_checks` below.
+# See module docstring.
+from support_service.services.ticket_service import (  # noqa: E402
+    create_ticket,
+    schedule_sla_checks,
+)
 
 # --- handle: inbound message orchestration ----------------------------------
 #
@@ -252,11 +290,19 @@ def handle_inbound(raw: dict[str, Any]) -> None:
     if _is_duplicate(db, message.provider_message_id):
         return
 
+    config = seed()
     contact_data = _ensure_contact(db, message, now)
-    contact = Contact(**from_firestore(contact_data))
+    contact = _drop_stale_session(
+        db, Contact(**from_firestore(contact_data)), message.wa_number, config, now
+    )
 
     _append_message(db, message, now)
     _update_last_inbound(db, message.wa_number, now)
+    if message.attachment:
+        task_service.enqueue(
+            "/tasks/media",
+            {"wa_number": message.wa_number, "message_id": message.provider_message_id},
+        )
 
     open_tickets = _load_open_tickets(db, contact)
     outbound_map = _load_outbound_map(db, message.wa_number)
@@ -273,7 +319,6 @@ def handle_inbound(raw: dict[str, Any]) -> None:
         closed_ticket_ids=closed_ids,
     )
 
-    config = seed()
     language = contact.language or Language.EN
 
     if isinstance(decision, StartReport):
@@ -296,13 +341,11 @@ def handle_inbound(raw: dict[str, Any]) -> None:
             )
 
         if turn.create:
-            ticket_id = create_ticket(turn.create, message.wa_number, now=now)
-            confirmation = config.text("ticket_created", Language(turn.create.language))
-            confirmation = confirmation.format(ticket_id=ticket_id)
-            _send_and_log(db, message.wa_number, confirmation, ticket_id, now)
-            _stamp_ticket_on_messages(db, message.wa_number, ticket_id, now)
+            _complete_report(db, message.wa_number, turn.create, config, now)
         elif turn.session:
             _update_session(db, message.wa_number, turn.session, now)
+            if turn.session.step is Step.DESCRIPTION:
+                _schedule_idle_check(message.wa_number, turn.session, config)
 
     elif isinstance(decision, AppendToTicket):
         _stamp_message(db, message, decision.ticket_id)
@@ -331,9 +374,72 @@ def handle_inbound(raw: dict[str, Any]) -> None:
         _send_replies(message.wa_number, (reply,), db, now)
 
     elif isinstance(decision, ReopenTicket):
-        _reopen(db, decision.ticket_id, message.wa_number, now)
+        if _reopen(db, decision.ticket_id, message.wa_number, now):
+            schedule_sla_checks(decision.ticket_id, now)
         text = config.text("reopened", language).format(ticket_id=decision.ticket_id)
         _send_and_log(db, message.wa_number, text, decision.ticket_id, now)
+
+
+def finish_idle_session(wa_number: str) -> str | None:
+    """Create the ticket for a description the contact never confirmed with Done.
+
+    Runs as a delayed Cloud Task. Every description message schedules one, so
+    all but the last find the contact still active and do nothing.
+    """
+    now = datetime.now(UTC)
+    db = get_db()
+    ref = db.collection("contacts").document(wa_number)
+    snap = ref.get()
+    session_data = (snap.to_dict() or {}).get("session") if snap.exists else None
+    if not session_data:
+        return None
+
+    session = Session(**from_firestore(session_data))
+    config = seed()
+    if now - session.last_activity_at < timedelta(seconds=config.settings.description_idle_seconds):
+        return None
+
+    draft = finish_idle(session)
+    if draft is None:
+        ref.update({"session": None, "updatedAt": now})
+        return None
+
+    try:
+        return _complete_report(db, wa_number, draft, config, now)
+    except ValueError:
+        # Already an open ticket for this product, so there is nothing to create.
+        ref.update({"session": None, "updatedAt": now})
+        return None
+
+
+def _complete_report(
+    db: Any, wa_number: str, draft: Draft, config: ConfigSnapshot, now: datetime
+) -> str:
+    ticket_id = create_ticket(draft, wa_number, now=now)
+    confirmation = config.text("ticket_created", Language(draft.language))
+    _send_and_log(db, wa_number, confirmation.format(ticket_id=ticket_id), ticket_id, now)
+    _stamp_ticket_on_messages(db, wa_number, ticket_id, now)
+    return ticket_id
+
+
+def _drop_stale_session(
+    db: Any, contact: Contact, wa_number: str, config: ConfigSnapshot, now: datetime
+) -> Contact:
+    """Forget a flow abandoned long ago, so an old step can't swallow a fresh "Hi"."""
+    session = contact.session
+    expiry = timedelta(hours=config.settings.session_expiry_hours)
+    if session is None or now - session.started_at < expiry:
+        return contact
+    db.collection("contacts").document(wa_number).update({"session": None, "updatedAt": now})
+    return contact.model_copy(update={"session": None})
+
+
+def _schedule_idle_check(wa_number: str, session: Session, config: ConfigSnapshot) -> None:
+    # A few seconds past the idle window, so the check never lands just before it.
+    delay = timedelta(seconds=config.settings.description_idle_seconds + 5)
+    task_service.enqueue(
+        "/tasks/idle", {"wa_number": wa_number}, at=session.last_activity_at + delay
+    )
 
 
 def _is_duplicate(db: Any, provider_message_id: str) -> bool:
@@ -435,39 +541,12 @@ def _send_replies(wa_number: str, replies: tuple, db: Any, now: datetime) -> Non
     for reply in replies:
         message_id = send_reply(wa_number, reply)
         text = reply.body if hasattr(reply, "body") else None
-        _log_outbound(db, wa_number, message_id, text, now)
+        log_outbound(db, wa_number, message_id, text, now)
 
 
 def _send_and_log(db: Any, wa_number: str, text: str, ticket_id: str, now: datetime) -> None:
     message_id = send_text(wa_number, text)
-    _log_outbound(db, wa_number, message_id, text, now, ticket_id=ticket_id)
-
-
-def _log_outbound(
-    db: Any,
-    wa_number: str,
-    message_id: str,
-    text: str | None,
-    now: datetime,
-    *,
-    ticket_id: str | None = None,
-) -> None:
-    ulid = str(ULID())
-    db.collection("contacts").document(wa_number).collection("messages").document(ulid).set(
-        to_firestore(
-            {
-                "message_id": message_id or ulid,
-                "direction": "out",
-                "ticket_id": ticket_id,
-                "type": "text",
-                "text": text,
-                "sent_via": "freeform",
-                "provider_status": "queued",
-                "created_at": now,
-            }
-        )
-    )
-    db.collection("contacts").document(wa_number).update({"lastOutboundAt": now, "updatedAt": now})
+    log_outbound(db, wa_number, message_id, text, now, ticket_id=ticket_id)
 
 
 def _update_session(db: Any, wa_number: str, session: Any, now: datetime) -> None:
@@ -510,11 +589,12 @@ def _log_event(db: Any, ticket_id: str, event_type: EventType, now: datetime) ->
     )
 
 
-def _reopen(db: Any, ticket_id: str, wa_number: str, now: datetime) -> None:
+def _reopen(db: Any, ticket_id: str, wa_number: str, now: datetime) -> bool:
+    """False when another open ticket already covers this product."""
     from google.cloud.firestore_v1 import transaction as fs_transaction
 
     @fs_transaction.transactional
-    def _txn(txn: fs_transaction.Transaction) -> None:
+    def _txn(txn: fs_transaction.Transaction) -> bool:
         ticket_ref = db.collection("tickets").document(ticket_id)
         contact_ref = db.collection("contacts").document(wa_number)
 
@@ -529,7 +609,7 @@ def _reopen(db: Any, ticket_id: str, wa_number: str, now: datetime) -> None:
         for oid in open_ids:
             other = db.collection("tickets").document(oid).get(transaction=txn)
             if other.exists and other.to_dict().get("serviceId") == service_id:
-                return
+                return False
 
         txn.update(
             ticket_ref,
@@ -537,6 +617,7 @@ def _reopen(db: Any, ticket_id: str, wa_number: str, now: datetime) -> None:
                 {
                     "status": TicketStatus.OPEN,
                     "sla_state": "ok",
+                    "sla_started_at": now,
                     "closed_at": None,
                     "updated_at": now,
                 }
@@ -570,5 +651,6 @@ def _reopen(db: Any, ticket_id: str, wa_number: str, now: datetime) -> None:
                 }
             ),
         )
+        return True
 
-    _txn(db.transaction())
+    return _txn(db.transaction())

@@ -253,12 +253,19 @@ class TestResendResolution:
             return "gs-msg-2"
 
         monkeypatch.setattr(resolution_module, "send_text", _send_text)
+        logged = MagicMock()
+        monkeypatch.setattr(resolution_module, "log_outbound", logged)
 
         response = client.post(f"/tickets/{TICKET_ID}/resend")
 
         assert response.status_code == 200
         assert response.json() == {"status": "ok", "messageId": "gs-msg-2"}
         assert sent == {"to": wa_number, "text": "Fixed it"}
+
+        # The delivery receipt that later closes the ticket finds it via this record.
+        logged.assert_called_once()
+        assert logged.call_args.args[1:4] == (wa_number, "gs-msg-2", "Fixed it")
+        assert logged.call_args.kwargs == {"ticket_id": TICKET_ID, "sent_via": "freeform"}
 
         # No status-transition attempt: the fix's whole point is that this
         # path never calls validate_transition(RESOLVED, RESOLVED). Instead
@@ -294,6 +301,55 @@ class TestAttachmentUrl:
         assert response.status_code == 404
 
 
+class TestDeleteContact:
+    def test_success_returns_what_was_deleted(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        counts = {"messages": 3, "inbound": 1, "tickets": 1, "events": 2, "contact": 1}
+        purged: list[str] = []
+        monkeypatch.setattr(admin_routes, "purge_contact", lambda wa: purged.append(wa) or counts)
+
+        response = client.delete("/contacts/919876500001")
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok", "deleted": counts}
+        assert purged == ["919876500001"]
+
+    def test_non_numeric_number_returns_400_without_deleting(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        purge = MagicMock()
+        monkeypatch.setattr(admin_routes, "purge_contact", purge)
+
+        response = client.delete("/contacts/not-a-number")
+
+        assert response.status_code == 400
+        purge.assert_not_called()
+
+
+class TestRetryAttachment:
+    def test_queues_the_download_again(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        requeue = MagicMock(return_value=True)
+        monkeypatch.setattr(admin_routes, "requeue_attachment", requeue)
+
+        response = client.post("/attachments/wamid.abc/retry")
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "queued"}
+        requeue.assert_called_once_with("wamid.abc")
+
+    def test_nothing_to_retry_returns_409(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(admin_routes, "requeue_attachment", MagicMock(return_value=False))
+
+        response = client.post("/attachments/wamid.abc/retry")
+
+        assert response.status_code == 409
+
+
 class TestAuth:
     def test_missing_token_returns_401(self) -> None:
         response = TestClient(app).patch(f"/tickets/{TICKET_ID}/status", json={"to": "in_progress"})
@@ -302,5 +358,15 @@ class TestAuth:
 
     def test_missing_token_returns_401_for_attachment_url(self) -> None:
         response = TestClient(app).get("/attachments/wamid.abc/url")
+
+        assert response.status_code == 401
+
+    def test_missing_token_returns_401_for_delete_contact(self) -> None:
+        response = TestClient(app).delete("/contacts/919876500001")
+
+        assert response.status_code == 401
+
+    def test_missing_token_returns_401_for_retry_attachment(self) -> None:
+        response = TestClient(app).post("/attachments/wamid.abc/retry")
 
         assert response.status_code == 401

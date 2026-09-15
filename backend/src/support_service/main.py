@@ -8,7 +8,14 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from support_service.controllers import admin_router, attachment_router, auth_router, jobs_router, webhook_router
+from support_service.controllers import (
+    admin_router,
+    attachment_router,
+    auth_router,
+    contact_router,
+    tasks_router,
+    webhook_router,
+)
 
 # Interactive docs are a local-dev convenience. In production this is an
 # admin-only service behind Firebase Auth — it should not advertise its
@@ -42,7 +49,8 @@ app.include_router(auth_router)
 app.include_router(webhook_router)
 app.include_router(admin_router)
 app.include_router(attachment_router)
-app.include_router(jobs_router)
+app.include_router(contact_router)
+app.include_router(tasks_router)
 
 
 @app.get("/healthz", tags=["ops"], summary="Liveness probe")

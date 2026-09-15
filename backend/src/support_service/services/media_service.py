@@ -2,81 +2,107 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import timedelta
+from typing import Any
+from urllib.parse import urlparse
 
+import google.auth
 import httpx
 from firebase_admin import storage
+from google.auth.transport.requests import Request
 
 from support_service.models import AttachmentState
 from support_service.repositories.base import get_db, to_firestore
-from support_service.repositories.message_repository import find_by_message_id, pending_attachments
+from support_service.repositories.contact_repository import contact_messages
+from support_service.repositories.message_repository import find_by_message_id
+from support_service.services import task_service
 
 MAX_ATTEMPTS = 5
 
+log = logging.getLogger(__name__)
+_signing_credentials: Any = None
 
-def fetch_pending_media() -> int:
-    """Fetch pending attachments from Gupshup and store in Cloud Storage (§4.1 step 7)."""
+
+class MediaNotReady(Exception):
+    """The download failed but attempts remain, so the caller should retry."""
+
+
+def fetch_attachment(wa_number: str, message_id: str) -> str:
+    """Copy one inbound photo, video or file into Cloud Storage (§4.1 step 7).
+
+    Returns the attachment's final state. Safe to run twice: anything no
+    longer pending is left alone.
+    """
     db = get_db()
-    bucket = storage.bucket(os.environ.get("STORAGE_BUCKET"))
+    ref = contact_messages(db, wa_number).document(message_id)
+    snap = ref.get()
+    attachment = (snap.to_dict() or {}).get("attachment") if snap.exists else None
+    if not attachment:
+        return "missing"
+    if attachment.get("state") != AttachmentState.PENDING:
+        return attachment["state"]
 
-    pending = pending_attachments(db, limit=20).get()
+    url = attachment.get("mediaUrl") or ""
+    # The URL comes from the webhook body, so only ever fetch from Gupshup.
+    if not _is_gupshup(url):
+        log.warning("Attachment %s has no usable Gupshup URL", message_id)
+        ref.update({"attachment.state": AttachmentState.FAILED})
+        return AttachmentState.FAILED
 
-    fetched = 0
-    api_key = os.environ.get("GUPSHUP_API_KEY", "")
-    app_id = os.environ.get("GUPSHUP_APP_NAME", "")
-
-    for doc in pending:
-        data = doc.to_dict()
-        attachment = data.get("attachment", {})
-        attempts = attachment.get("attempts", 0)
-
+    attempts = attachment.get("attempts", 0) + 1
+    try:
+        response = httpx.get(url, timeout=60.0, follow_redirects=True)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        log.warning("Download of %s failed (attempt %d): %s", message_id, attempts, exc)
         if attempts >= MAX_ATTEMPTS:
-            doc.reference.update({"attachment.state": "failed"})
-            continue
-
-        media_id = attachment.get("mediaId")
-        if not media_id:
-            doc.reference.update(
-                {
-                    "attachment.state": "failed",
-                    "attachment.attempts": attempts + 1,
-                }
+            ref.update(
+                {"attachment.state": AttachmentState.FAILED, "attachment.attempts": attempts}
             )
-            continue
+            return AttachmentState.FAILED
+        ref.update({"attachment.attempts": attempts})
+        raise MediaNotReady(message_id) from exc
 
-        try:
-            response = httpx.get(
-                f"https://api.gupshup.io/wa/api/v1/msg/{app_id}/media/{media_id}",
-                headers={"apikey": api_key},
-                timeout=30.0,
-            )
-            response.raise_for_status()
-        except Exception:
-            doc.reference.update({"attachment.attempts": attempts + 1})
-            continue
+    path = f"attachments/{wa_number}/{message_id}"
+    mime = attachment.get("mimeType") or response.headers.get(
+        "content-type", "application/octet-stream"
+    )
+    bucket = storage.bucket(os.environ.get("STORAGE_BUCKET"))
+    bucket.blob(path).upload_from_string(response.content, content_type=mime)
 
-        wa_number = doc.reference.parent.parent.id
-        message_id = doc.id
-        path = f"attachments/{wa_number}/{message_id}"
-        mime = attachment.get("mimeType", "application/octet-stream")
-
-        blob = bucket.blob(path)
-        blob.upload_from_string(response.content, content_type=mime)
-
-        doc.reference.update(
-            to_firestore(
-                {
-                    "attachment.state": AttachmentState.STORED,
-                    "attachment.storage_path": path,
-                    "attachment.size_bytes": len(response.content),
-                    "attachment.attempts": attempts + 1,
-                }
-            )
+    ref.update(
+        to_firestore(
+            {
+                "attachment.state": AttachmentState.STORED,
+                "attachment.storage_path": path,
+                "attachment.size_bytes": len(response.content),
+                "attachment.attempts": attempts,
+            }
         )
-        fetched += 1
+    )
+    return AttachmentState.STORED
 
-    return fetched
+
+def _is_gupshup(url: str) -> bool:
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    return parsed.scheme == "https" and (host == "gupshup.io" or host.endswith(".gupshup.io"))
+
+
+def requeue_attachment(message_id: str) -> bool:
+    """Put a failed or stuck download back in the queue. False if nothing to retry."""
+    doc = find_by_message_id(get_db(), message_id)
+    attachment = (doc.to_dict() or {}).get("attachment") if doc else None
+    if doc is None or not attachment or attachment.get("state") == AttachmentState.STORED:
+        return False
+
+    doc.reference.update({"attachment.state": AttachmentState.PENDING, "attachment.attempts": 0})
+    task_service.enqueue(
+        "/tasks/media", {"wa_number": doc.reference.parent.parent.id, "message_id": doc.id}
+    )
+    return True
 
 
 def get_signed_url(message_id: str) -> str | None:
@@ -97,5 +123,25 @@ def get_signed_url(message_id: str) -> str | None:
 
     bucket = storage.bucket(os.environ.get("STORAGE_BUCKET"))
     blob = bucket.blob(storage_path)
-    url = blob.generate_signed_url(expiration=timedelta(minutes=15))
-    return url
+    email, token = _signer()
+    return blob.generate_signed_url(
+        version="v4",
+        expiration=timedelta(minutes=15),
+        service_account_email=email,
+        access_token=token,
+    )
+
+
+def _signer() -> tuple[str | None, str | None]:
+    """Cloud Run's credentials carry no private key, so sign through the IAM
+    API as the service account instead (it has Service Account Token Creator)."""
+    global _signing_credentials
+    if _signing_credentials is None:
+        _signing_credentials, _ = google.auth.default()
+    if not _signing_credentials.valid:
+        _signing_credentials.refresh(Request())
+
+    email = getattr(_signing_credentials, "service_account_email", None)
+    if not email:
+        return None, None
+    return email, _signing_credentials.token

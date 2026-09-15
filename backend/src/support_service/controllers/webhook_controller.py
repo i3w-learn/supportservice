@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Response
 
+from support_service.conversation.routing import REOPEN_WINDOW
 from support_service.models import EventType, ProviderStatus, TicketStatus
 from support_service.repositories.base import get_db, to_firestore
 from support_service.repositories.contact_repository import contact_ref as _contact_ref
@@ -29,42 +30,37 @@ def _check_secret(secret: str | None) -> bool:
     return hmac.compare_digest(secret, expected)
 
 
+_STATUS_MAP = {
+    "enqueued": ProviderStatus.QUEUED,
+    "sent": ProviderStatus.SENT,
+    "delivered": ProviderStatus.DELIVERED,
+    "read": ProviderStatus.READ,
+    "failed": ProviderStatus.FAILED,
+}
+
+
 @router.post("/gupshup")
 def inbound(body: dict[str, Any], secret: str | None = Query(None)) -> Response:
     if not _check_secret(secret):
         return Response(status_code=401)
 
+    # Gupshup sends every event type to the one configured webhook URL, so
+    # inbound messages and delivery receipts both arrive here.
     msg_type = body.get("type")
-    if msg_type != "message":
-        return Response(status_code=200)
+    if msg_type == "message":
+        handle_inbound(body)
+    elif msg_type == "message-event":
+        _handle_receipt(body)
 
-    handle_inbound(body)
     return Response(status_code=200)
 
 
-@router.post("/gupshup/status")
-def receipt(body: dict[str, Any], secret: str | None = Query(None)) -> Response:
-    if not _check_secret(secret):
-        return Response(status_code=401)
-
-    if body.get("type") != "message-event":
-        return Response(status_code=200)
-
+def _handle_receipt(body: dict[str, Any]) -> None:
     payload = body.get("payload", {})
-    event_type = payload.get("type")
     gs_id = payload.get("gsId", "")
-
-    status_map = {
-        "enqueued": ProviderStatus.QUEUED,
-        "sent": ProviderStatus.SENT,
-        "delivered": ProviderStatus.DELIVERED,
-        "read": ProviderStatus.READ,
-        "failed": ProviderStatus.FAILED,
-    }
-
-    provider_status = status_map.get(event_type)
+    provider_status = _STATUS_MAP.get(payload.get("type"))
     if not provider_status or not gs_id:
-        return Response(status_code=200)
+        return
 
     _update_message_status(gs_id, provider_status)
 
@@ -72,8 +68,6 @@ def receipt(body: dict[str, Any], secret: str | None = Query(None)) -> Response:
         _try_close_on_delivery(gs_id)
     elif provider_status == ProviderStatus.FAILED:
         _mark_resolution_failed(gs_id)
-
-    return Response(status_code=200)
 
 
 def _update_message_status(gs_id: str, status: ProviderStatus) -> None:
@@ -138,7 +132,12 @@ def _try_close_on_delivery(gs_id: str) -> None:
         if contact_snap.exists:
             contact_data = contact_snap.to_dict()
             open_ids = [oid for oid in contact_data.get("openTicketIds", []) if oid != ticket_id]
-            recently_closed = contact_data.get("recentlyClosed", [])
+            # Drop entries past the reopen window while this document is being written anyway.
+            recently_closed = [
+                entry
+                for entry in contact_data.get("recentlyClosed", [])
+                if entry.get("closedAt") and now - entry["closedAt"] <= REOPEN_WINDOW
+            ]
             recently_closed.append(
                 {
                     "ticketId": ticket_id,

@@ -218,6 +218,9 @@ def _on_description(
     if message.text:
         existing = draft.get("description", "")
         draft["description"] = f"{existing}\n{message.text}".strip() if existing else message.text
+    if message.attachment is not None:
+        # Lets the idle rescue file a photos-only report (see finish_idle).
+        draft["has_media"] = "yes"
 
     # Anything else — more text, a photo — keeps the step open.
     return Turn(
@@ -234,12 +237,12 @@ def _on_description(
 def finish_idle(session: Session) -> Draft | None:
     """Close a `description` step abandoned past the idle window.
 
-    Called by the 2-minute cron, not by a message. Cloud Run freezes the CPU
-    between requests, so a timer inside the process would never fire.
+    Called by a delayed Cloud Task, not by a message. Cloud Run freezes the
+    CPU between requests, so a timer inside the process would never fire.
     """
     if session.step is not Step.DESCRIPTION:
         return None
-    if not session.draft.get("description"):
+    if not (session.draft.get("description") or session.draft.get("has_media")):
         return None
     return _to_draft(session.draft)
 

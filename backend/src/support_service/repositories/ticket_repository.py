@@ -23,12 +23,3 @@ def ticket_events(db: Any, ticket_id: str) -> Any:
 
 def log_event(db: Any, ticket_id: str, event_data: dict[str, Any]) -> None:
     ticket_events(db, ticket_id).document().set(to_firestore(event_data))
-
-
-def open_tickets_for_sla_sweep(db: Any, *, limit: int = 100) -> Any:
-    return (
-        tickets(db)
-        .where("status", "in", ["open", "in_progress"])
-        .where("slaState", "!=", "breached")
-        .limit(limit)
-    )

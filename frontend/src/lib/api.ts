@@ -41,8 +41,11 @@ export const api = {
   resend: (ticketId: string) =>
     post(`/tickets/${ticketId}/resend`),
 
+  retryAttachment: (messageId: string) =>
+    post(`/attachments/${encodeURIComponent(messageId)}/retry`),
+
   getAttachmentUrl: async (messageId: string): Promise<string | null> => {
-    const res = await fetch(`${BASE}/attachments/${messageId}/url`, {
+    const res = await fetch(`${BASE}/attachments/${encodeURIComponent(messageId)}/url`, {
       headers: await headers(),
     })
     if (!res.ok) return null

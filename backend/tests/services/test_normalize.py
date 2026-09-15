@@ -78,8 +78,9 @@ def test_image_message() -> None:
             "source": "919876543210",
             "type": "image",
             "payload": {
-                "url": "https://media.example.com/img.jpg",
-                "mediaId": "76534618",
+                "url": "https://filemanager.gupshup.io/fm/wamedia/TestApp/img-1",
+                "contentType": "image/png",
+                "urlExpiry": 1726492800000,
                 "caption": "See this",
             },
             "sender": {"phone": "919876543210", "name": "Test"},
@@ -90,8 +91,29 @@ def test_image_message() -> None:
     assert msg.text == "See this"
     assert msg.attachment is not None
     assert msg.attachment.state == AttachmentState.PENDING
-    assert msg.attachment.mime_type == "image/jpeg"
-    assert msg.attachment.media_id == "76534618"
+    assert msg.attachment.mime_type == "image/png"
+    assert msg.attachment.media_url == "https://filemanager.gupshup.io/fm/wamedia/TestApp/img-1"
+
+
+def test_video_without_content_type_falls_back_to_a_guess() -> None:
+    payload = {
+        "app": "TestApp",
+        "timestamp": 1725888000000,
+        "version": 2,
+        "type": "message",
+        "payload": {
+            "id": "wamid.VID1",
+            "source": "919876543210",
+            "type": "video",
+            "payload": {"url": "https://filemanager.gupshup.io/fm/wamedia/TestApp/vid-1"},
+            "sender": {"phone": "919876543210", "name": "Test"},
+        },
+    }
+    msg = normalize(payload)
+    assert msg.type == MessageType.VIDEO
+    assert msg.attachment is not None
+    assert msg.attachment.mime_type == "video/mp4"
+    assert msg.attachment.media_url == "https://filemanager.gupshup.io/fm/wamedia/TestApp/vid-1"
 
 
 def test_reply_context() -> None:

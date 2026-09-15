@@ -15,8 +15,11 @@ production Firestore.
 """
 
 import os
+from unittest.mock import MagicMock
 
 import pytest
+
+from support_service.services import task_service
 
 REQUIRED_EMULATOR_VARS = (
     "FIRESTORE_EMULATOR_HOST",
@@ -39,3 +42,11 @@ def guard_against_real_firestore(request: pytest.FixtureRequest) -> None:
             f"{', '.join(missing)} not set. Start the emulator with "
             "`just emulators`, then run `just test`."
         )
+
+
+@pytest.fixture(autouse=True)
+def enqueued(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Records Cloud Tasks instead of creating them, so no test reaches GCP."""
+    recorder = MagicMock()
+    monkeypatch.setattr(task_service, "enqueue", recorder)
+    return recorder

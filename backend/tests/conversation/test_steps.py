@@ -197,6 +197,11 @@ class TestDescriptionStep:
         assert turn.session is not None
         assert turn.session.step is Step.DESCRIPTION
 
+    def test_a_photo_is_remembered_for_the_idle_rescue(self) -> None:
+        turn = advance(self.base(), photo(), CONFIG, now=NOW)
+        assert turn.session is not None
+        assert turn.session.draft["has_media"] == "yes"
+
     def test_several_messages_are_joined(self) -> None:
         contact = self.base()
         turn = advance(contact, say("headset dead"), CONFIG, now=NOW)
@@ -215,7 +220,7 @@ class TestDescriptionStep:
 
 
 class TestIdleRescue:
-    """Cloud Run has no timers between requests, so the cron finishes these."""
+    """Cloud Run has no timers between requests, so a delayed Cloud Task finishes these."""
 
     def test_abandoned_description_is_completed_from_its_draft(self) -> None:
         session = Session(
@@ -250,3 +255,22 @@ class TestIdleRescue:
             last_activity_at=NOW,
         )
         assert finish_idle(session) is None
+
+    def test_photos_alone_are_rescued_with_an_empty_description(self) -> None:
+        session = Session(
+            flow=Flow.REPORT,
+            step=Step.DESCRIPTION,
+            draft={
+                "language": "en",
+                "service_id": "anganwadi-vr",
+                "category_id": "headset",
+                "display_name": "Sunita",
+                "centre_name": "AWC 42",
+                "has_media": "yes",
+            },
+            started_at=NOW,
+            last_activity_at=NOW,
+        )
+        draft = finish_idle(session)
+        assert draft is not None
+        assert draft.description == ""

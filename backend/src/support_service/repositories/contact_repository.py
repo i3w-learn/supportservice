@@ -27,20 +27,3 @@ def outbound_messages_with_ticket(db: Any, wa_number: str, *, limit: int = 20) -
         .order_by("createdAt", direction="DESCENDING")
         .limit(limit)
     )
-
-
-def expired_sessions(db: Any, cutoff: Any, *, limit: int = 50) -> Any:
-    return contacts(db).where("session.startedAt", "<", cutoff).limit(limit)
-
-
-def idle_description_sessions(db: Any, cutoff: Any, *, limit: int = 20) -> Any:
-    return (
-        contacts(db)
-        .where("session.step", "==", "description")
-        .where("session.lastActivityAt", "<", cutoff)
-        .limit(limit)
-    )
-
-
-def contacts_with_recently_closed(db: Any, *, limit: int = 50) -> Any:
-    return contacts(db).where("recentlyClosed", "!=", []).limit(limit)

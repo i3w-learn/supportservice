@@ -10,11 +10,12 @@ their outputs to the right Firestore writes and outbound sends.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
 
+from support_service.config.defaults import seed
 from support_service.conversation.routing import (
     AppendToTicket,
     AskAboutRecentlyClosed,
@@ -54,6 +55,21 @@ def _raw_text(message_id: str = "wamid.1", text: str = "Hello") -> dict[str, obj
             "sender": {"phone": WA_NUMBER, "name": "Test"},
         },
     }
+
+
+def _raw_image(message_id: str = "wamid.img") -> dict[str, object]:
+    raw = _raw_text(message_id)
+    raw["payload"] = {
+        "id": message_id,
+        "source": WA_NUMBER,
+        "type": "image",
+        "payload": {
+            "url": "https://filemanager.gupshup.io/fm/wamedia/TestApp/img-1",
+            "contentType": "image/jpeg",
+        },
+        "sender": {"phone": WA_NUMBER, "name": "Test"},
+    }
+    return raw
 
 
 def _fresh_db() -> MagicMock:
@@ -374,10 +390,10 @@ class TestAskAboutRecentlyClosedDispatch:
 
 class TestReopenTicketDispatch:
     def test_reopens_and_confirms(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
+        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch, enqueued: MagicMock
     ) -> None:
         monkeypatch.setattr(handle_module, "route", MagicMock(return_value=ReopenTicket("TKT-9")))
-        reopen_mock = MagicMock()
+        reopen_mock = MagicMock(return_value=True)
         monkeypatch.setattr(handle_module, "_reopen", reopen_mock)
         send_text_mock = MagicMock(return_value="msg-out-7")
         monkeypatch.setattr(handle_module, "send_text", send_text_mock)
@@ -394,3 +410,101 @@ class TestReopenTicketDispatch:
         sent_wa, sent_text = send_text_mock.call_args.args
         assert sent_wa == WA_NUMBER
         assert "TKT-9" in sent_text
+
+        # The deadline clock restarts, so both checks are scheduled again.
+        sla_calls = [c for c in enqueued.call_args_list if c.args[0] == "/tasks/sla"]
+        assert [c.args[1] for c in sla_calls] == [{"ticket_id": "TKT-9"}] * 2
+
+    def test_no_new_deadlines_when_another_ticket_covers_the_product(
+        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch, enqueued: MagicMock
+    ) -> None:
+        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=ReopenTicket("TKT-9")))
+        monkeypatch.setattr(handle_module, "_reopen", MagicMock(return_value=False))
+        monkeypatch.setattr(handle_module, "send_text", MagicMock(return_value="msg-out-8"))
+
+        handle_inbound(_raw_text())
+
+        enqueued.assert_not_called()
+
+
+class TestBackgroundWork:
+    def test_attachment_queues_a_download(
+        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch, enqueued: MagicMock
+    ) -> None:
+        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=StartReport()))
+        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=Turn()))
+
+        handle_inbound(_raw_image("wamid.img"))
+
+        enqueued.assert_called_once_with(
+            "/tasks/media", {"wa_number": WA_NUMBER, "message_id": "wamid.img"}
+        )
+        messages = mock_db.collection("contacts").document.return_value.collection.return_value
+        stored = messages.document.return_value.set.call_args_list[0].args[0]
+        assert stored["attachment"]["mediaUrl"].startswith("https://filemanager.gupshup.io/")
+
+    def test_text_message_queues_nothing(
+        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch, enqueued: MagicMock
+    ) -> None:
+        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=StartReport()))
+        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=Turn()))
+
+        handle_inbound(_raw_text())
+
+        enqueued.assert_not_called()
+
+    def test_description_step_schedules_an_idle_check(
+        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch, enqueued: MagicMock
+    ) -> None:
+        session = Session(
+            flow=Flow.REPORT, step=Step.DESCRIPTION, started_at=NOW, last_activity_at=NOW
+        )
+        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=ContinueSession()))
+        monkeypatch.setattr(handle_module, "advance", MagicMock(return_value=Turn(session=session)))
+
+        handle_inbound(_raw_text())
+
+        idle = seed().settings.description_idle_seconds
+        enqueued.assert_called_once_with(
+            "/tasks/idle", {"wa_number": WA_NUMBER}, at=NOW + timedelta(seconds=idle + 5)
+        )
+
+
+class TestStaleSession:
+    def _contact_with_session_started(self, mock_db: MagicMock, ago: timedelta) -> None:
+        started = datetime.now(UTC) - ago
+        session = {
+            "flow": "report",
+            "step": "name",
+            "draft": {},
+            "startedAt": started,
+            "lastActivityAt": started,
+        }
+        contacts = mock_db.collection("contacts")
+        contacts.document.return_value.get.return_value = _contact_snapshot(session=session)
+
+    def test_abandoned_flow_is_dropped_before_routing(
+        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        expiry = timedelta(hours=seed().settings.session_expiry_hours)
+        self._contact_with_session_started(mock_db, expiry + timedelta(hours=1))
+        route_mock = MagicMock(return_value=StartReport())
+        monkeypatch.setattr(handle_module, "route", route_mock)
+        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=Turn()))
+
+        handle_inbound(_raw_text())
+
+        assert route_mock.call_args.args[0].session is None
+        contact_doc = mock_db.collection("contacts").document.return_value
+        updates = [c.args[0] for c in contact_doc.update.call_args_list]
+        assert any("session" in u and u["session"] is None for u in updates)
+
+    def test_recent_flow_is_kept(self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._contact_with_session_started(mock_db, timedelta(minutes=10))
+        route_mock = MagicMock(return_value=ContinueSession())
+        monkeypatch.setattr(handle_module, "route", route_mock)
+        monkeypatch.setattr(handle_module, "advance", MagicMock(return_value=Turn()))
+
+        handle_inbound(_raw_text())
+
+        assert route_mock.call_args.args[0].session is not None

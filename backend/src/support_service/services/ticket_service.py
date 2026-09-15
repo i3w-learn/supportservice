@@ -14,9 +14,11 @@ from datetime import UTC, datetime, timedelta
 
 from google.cloud.firestore_v1 import transaction as fs_transaction
 
+from support_service.config.defaults import seed
 from support_service.conversation.steps import Draft
 from support_service.models import EventType, ProviderStatus, SlaState, TicketStatus
 from support_service.repositories.base import get_db, get_doc, to_firestore
+from support_service.services import task_service
 
 # --- status transitions (§8) ----------------------------------------------
 
@@ -123,12 +125,29 @@ def create_ticket(draft: Draft, wa_number: str, *, now: datetime | None = None) 
 
         return ticket_id
 
-    return _txn(db.transaction())
+    ticket_id = _txn(db.transaction())
+    schedule_sla_checks(ticket_id, now)
+    return ticket_id
 
 
-# `channel_service` needs `create_ticket` above; this module needs
-# `channel_service.send_text` / `send_template` below. See module docstring.
-from support_service.services.channel_service import send_template, send_text  # noqa: E402
+def schedule_sla_checks(ticket_id: str, start: datetime) -> None:
+    """One delayed check per deadline, counted from creation or reopen (§11)."""
+    settings = seed().settings
+    # A minute past each deadline, so clock skew never runs the check early.
+    for hours in (settings.sla_reminder_hours, settings.sla_breach_hours):
+        task_service.enqueue(
+            "/tasks/sla", {"ticket_id": ticket_id}, at=start + timedelta(hours=hours, minutes=1)
+        )
+
+
+# `channel_service` needs `create_ticket` / `schedule_sla_checks` above; this
+# module needs `channel_service.send_text` / `send_template` / `log_outbound`
+# below. See module docstring.
+from support_service.services.channel_service import (  # noqa: E402
+    log_outbound,
+    send_template,
+    send_text,
+)
 
 TEMPLATE_NAMES: dict[str, str] = {
     "en": "i3w_b2g_support_bot_en",
@@ -168,6 +187,10 @@ def resolve_ticket(ticket_id: str, text: str, actor_uid: str) -> str:
         sent_via = "template"
 
     db = get_db()
+    # The delivery receipt closes the ticket by looking this record up by
+    # message id (webhook_controller), so the send must be recorded.
+    log_outbound(db, wa_number, message_id, text, now, ticket_id=ticket_id, sent_via=sent_via)
+
     ticket_ref = db.collection("tickets").document(ticket_id)
     ticket_ref.update(
         to_firestore(
@@ -243,6 +266,8 @@ def resend_resolution(ticket_id: str, actor_uid: str) -> str:
         sent_via = "template"
 
     db = get_db()
+    log_outbound(db, wa_number, message_id, text, now, ticket_id=ticket_id, sent_via=sent_via)
+
     ticket_ref = db.collection("tickets").document(ticket_id)
     ticket_ref.update(
         to_firestore(
@@ -273,3 +298,48 @@ def resend_resolution(ticket_id: str, actor_uid: str) -> str:
     )
 
     return message_id
+
+
+# --- SLA — one delayed check per deadline, scheduled at creation (§11) -----
+
+
+def check_sla(ticket_id: str, *, now: datetime | None = None) -> SlaState | None:
+    """Flag an unanswered ticket that is past its reminder or breach deadline."""
+    now = now or datetime.now(UTC)
+    settings = seed().settings
+    ticket_ref = get_db().collection("tickets").document(ticket_id)
+    snap = ticket_ref.get()
+    data = snap.to_dict() if snap.exists else None
+    if not data or data.get("status") not in (TicketStatus.OPEN, TicketStatus.IN_PROGRESS):
+        return None
+    # A reopened ticket's clock restarts at the reopen, not at creation.
+    started = data.get("slaStartedAt") or data.get("createdAt")
+    if not started:
+        return None
+
+    current = data.get("slaState", SlaState.OK)
+    age = now - started
+    if age >= timedelta(hours=settings.sla_breach_hours) and current != SlaState.BREACHED:
+        new_state = SlaState.BREACHED
+        note = f"{settings.sla_breach_hours}h with no resolution"
+    elif age >= timedelta(hours=settings.sla_reminder_hours) and current == SlaState.OK:
+        new_state = SlaState.REMINDER_DUE
+        note = f"{settings.sla_reminder_hours}h with no first response"
+    else:
+        return None
+
+    ticket_ref.update(to_firestore({"sla_state": new_state, "updated_at": now}))
+    ticket_ref.collection("events").document().set(
+        to_firestore(
+            {
+                "type": EventType.SLA_FLAGGED,
+                "from": current,
+                "to": new_state,
+                "actor": "system",
+                "actor_uid": None,
+                "note": note,
+                "at": now,
+            }
+        )
+    )
+    return new_state
