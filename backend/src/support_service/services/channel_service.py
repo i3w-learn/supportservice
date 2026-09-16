@@ -20,33 +20,31 @@ from typing import Any
 import httpx
 from ulid import ULID
 
+from support_service.config import defaults
 from support_service.config.defaults import seed
 from support_service.config.models import ConfigSnapshot
 from support_service.conversation.routing import (
-    AppendToTicket,
-    AskAboutRecentlyClosed,
     ContinueSession,
-    Disambiguate,
-    ReopenTicket,
-    StartReport,
+    OfferReturningOptions,
     route,
 )
 from support_service.conversation.steps import (
     Draft,
     Reply,
     Row,
-    SendButtons,
     SendList,
+    SendTemplate,
     SendText,
+    Turn,
     advance,
     begin,
     finish_idle,
+    offer_returning,
 )
 from support_service.models import (
     Attachment,
     AttachmentState,
     Contact,
-    EventType,
     InboundMessage,
     Language,
     MessageType,
@@ -127,6 +125,7 @@ def normalize(raw: dict[str, Any]) -> InboundMessage:
         wa_number=payload["source"],
         type=msg_type,
         text=text,
+        sender_name=payload.get("sender", {}).get("name"),
         reply_id=reply_id,
         context_message_id=context_message_id,
         attachment=attachment,
@@ -200,18 +199,6 @@ def send_list(to: str, body: str, button_title: str, rows: list[Row]) -> str:
     )
 
 
-def send_buttons(to: str, body: str, buttons: list[Row]) -> str:
-    return _send(
-        to,
-        {
-            "type": "quick_reply",
-            "msgid": "qr",
-            "content": {"type": "text", "text": body},
-            "options": [{"type": "text", "title": btn.label[:20]} for btn in buttons],
-        },
-    )
-
-
 def send_template(to: str, template_name: str, language: str, params: list[str]) -> str:
     return _send(
         to,
@@ -236,8 +223,8 @@ def send_reply(to: str, reply: Reply) -> str:
         return send_text(to, reply.body)
     if isinstance(reply, SendList):
         return send_list(to, reply.body, "Choose", list(reply.rows))
-    if isinstance(reply, SendButtons):
-        return send_buttons(to, reply.body, list(reply.buttons))
+    if isinstance(reply, SendTemplate):
+        return send_template(to, reply.name, reply.language.value, list(reply.params))
     raise ValueError(f"Unknown reply type: {type(reply)}")
 
 
@@ -274,7 +261,6 @@ def log_outbound(
 # See module docstring.
 from support_service.services.ticket_service import (  # noqa: E402
     create_ticket,
-    schedule_sla_checks,
 )
 
 # --- handle: inbound message orchestration ----------------------------------
@@ -304,86 +290,43 @@ def handle_inbound(raw: dict[str, Any]) -> None:
             {"wa_number": message.wa_number, "message_id": message.provider_message_id},
         )
 
-    open_tickets = _load_open_tickets(db, contact)
-    outbound_map = _load_outbound_map(db, message.wa_number)
-    closed_ids = frozenset(ref.ticket_id for ref in contact.recently_closed) - frozenset(
-        t.ticket_id for t in open_tickets
-    )
-
-    decision = route(
-        contact,
-        message,
-        open_tickets,
-        now=now,
-        ticket_id_for_outbound=outbound_map,
-        closed_ticket_ids=closed_ids,
-    )
-
+    decision = route(contact, _load_open_tickets(db, contact))
     language = contact.language or Language.EN
 
-    if isinstance(decision, StartReport):
-        turn = begin(contact, config, now=now)
-        _send_replies(message.wa_number, turn.replies, db, now)
-        if turn.session:
-            _update_session(db, message.wa_number, turn.session, now)
-        if turn.learned_language:
-            db.collection("contacts").document(message.wa_number).update(
-                {"language": turn.learned_language.value}
-            )
-
-    elif isinstance(decision, ContinueSession):
+    if isinstance(decision, ContinueSession):
         turn = advance(contact, message, config, now=now)
-        _send_replies(message.wa_number, turn.replies, db, now)
+    elif isinstance(decision, OfferReturningOptions):
+        turn = offer_returning(decision.ticket, language, now=now)
+    else:
+        turn = begin(contact, config, now=now)
 
-        if turn.learned_language:
-            db.collection("contacts").document(message.wa_number).update(
-                {"language": turn.learned_language.value}
-            )
+    _apply(db, message.wa_number, turn, config, now)
 
-        if turn.create:
-            _complete_report(db, message.wa_number, turn.create, config, now)
-        elif turn.session:
-            _update_session(db, message.wa_number, turn.session, now)
-            if turn.session.step is Step.DESCRIPTION:
-                _schedule_idle_check(message.wa_number, turn.session, config)
 
-    elif isinstance(decision, AppendToTicket):
-        _stamp_message(db, message, decision.ticket_id)
-        _log_event(db, decision.ticket_id, EventType.MESSAGE_ADDED, now)
-        db.collection("tickets").document(decision.ticket_id).update({"lastInboundAt": now})
-        text = config.text("appended", language).format(ticket_id=decision.ticket_id)
-        _send_and_log(db, message.wa_number, text, decision.ticket_id, now)
+def _apply(db: Any, wa_number: str, turn: Turn, config: ConfigSnapshot, now: datetime) -> None:
+    """Send what the step machine decided, then persist what it left behind."""
+    _send_replies(wa_number, turn.replies, db, now)
 
-    elif isinstance(decision, Disambiguate):
-        rows = [Row(t.service_id, t.service_name) for t in decision.options] + [
-            Row("new", config.text("new_problem", language))
-        ]
-        reply = SendList(config.text("ask_which_ticket", language), tuple(rows))
-        _send_replies(message.wa_number, (reply,), db, now)
-
-    elif isinstance(decision, AskAboutRecentlyClosed):
-        service_name = decision.closed.service_id
-        text = config.text("ask_recently_closed", language).format(
-            service_name=service_name, ticket_id=decision.closed.ticket_id
+    if turn.learned_language:
+        db.collection("contacts").document(wa_number).update(
+            {"language": turn.learned_language.value}
         )
-        buttons = (
-            Row("reopen", config.text("yes_same", language)),
-            Row("new", config.text("new_problem", language)),
-        )
-        reply = SendButtons(text, buttons)
-        _send_replies(message.wa_number, (reply,), db, now)
 
-    elif isinstance(decision, ReopenTicket):
-        if _reopen(db, decision.ticket_id, message.wa_number, now):
-            schedule_sla_checks(decision.ticket_id, now)
-        text = config.text("reopened", language).format(ticket_id=decision.ticket_id)
-        _send_and_log(db, message.wa_number, text, decision.ticket_id, now)
+    if turn.create:
+        _complete_report(db, wa_number, turn.create, config, now)
+    elif turn.session:
+        _update_session(db, wa_number, turn.session, now)
+        if turn.session.step is Step.MEDIA:
+            _schedule_idle_check(wa_number, turn.session, config)
+    else:
+        # Nothing left to answer — the flow is over.
+        db.collection("contacts").document(wa_number).update({"session": None, "updatedAt": now})
 
 
 def finish_idle_session(wa_number: str) -> str | None:
-    """Create the ticket for a description the contact never confirmed with Done.
+    """File the report for a contact who never sent a photo or tapped Skip.
 
-    Runs as a delayed Cloud Task. Every description message schedules one, so
+    Runs as a delayed Cloud Task. Every media-step message schedules one, so
     all but the last find the contact still active and do nothing.
     """
     now = datetime.now(UTC)
@@ -396,7 +339,7 @@ def finish_idle_session(wa_number: str) -> str | None:
 
     session = Session(**from_firestore(session_data))
     config = seed()
-    if now - session.last_activity_at < timedelta(seconds=config.settings.description_idle_seconds):
+    if now - session.last_activity_at < timedelta(seconds=config.settings.media_idle_seconds):
         return None
 
     draft = finish_idle(session)
@@ -404,20 +347,20 @@ def finish_idle_session(wa_number: str) -> str | None:
         ref.update({"session": None, "updatedAt": now})
         return None
 
-    try:
-        return _complete_report(db, wa_number, draft, config, now)
-    except ValueError:
-        # Already an open ticket for this product, so there is nothing to create.
-        ref.update({"session": None, "updatedAt": now})
-        return None
+    return _complete_report(db, wa_number, draft, config, now)
 
 
 def _complete_report(
     db: Any, wa_number: str, draft: Draft, config: ConfigSnapshot, now: datetime
 ) -> str:
     ticket_id = create_ticket(draft, wa_number, now=now)
-    confirmation = config.text("ticket_created", Language(draft.language))
-    _send_and_log(db, wa_number, confirmation.format(ticket_id=ticket_id), ticket_id, now)
+    language = Language(draft.language)
+    confirmation = SendTemplate(
+        defaults.TICKET_CREATED,
+        language,
+        (ticket_id, config.category_label(draft.category_id, language), f"+{wa_number}"),
+    )
+    _send_replies(wa_number, (confirmation,), db, now, ticket_id=ticket_id)
     _stamp_ticket_on_messages(db, wa_number, ticket_id, now)
     return ticket_id
 
@@ -436,7 +379,7 @@ def _drop_stale_session(
 
 def _schedule_idle_check(wa_number: str, session: Session, config: ConfigSnapshot) -> None:
     # A few seconds past the idle window, so the check never lands just before it.
-    delay = timedelta(seconds=config.settings.description_idle_seconds + 5)
+    delay = timedelta(seconds=config.settings.media_idle_seconds + 5)
     task_service.enqueue(
         "/tasks/idle", {"wa_number": wa_number}, at=session.last_activity_at + delay
     )
@@ -459,16 +402,21 @@ def _ensure_contact(db: Any, message: InboundMessage, now: datetime) -> dict:
     ref = db.collection("contacts").document(message.wa_number)
     doc = ref.get()
     if doc.exists:
-        return doc.to_dict()
+        data = doc.to_dict()
+        # The WhatsApp profile name is the only name we get — the flow no
+        # longer asks for one.
+        if message.sender_name and not data.get("displayName"):
+            ref.update({"displayName": message.sender_name})
+            data["displayName"] = message.sender_name
+        return data
+
     data = to_firestore(
         {
             "wa_number": message.wa_number,
-            "display_name": None,
-            "centre_name": None,
+            "display_name": message.sender_name,
             "language": None,
             "session": None,
             "open_ticket_ids": [],
-            "recently_closed": [],
             "last_inbound_at": now,
             "last_outbound_at": None,
             "created_at": now,
@@ -503,62 +451,56 @@ def _update_last_inbound(db: Any, wa_number: str, now: datetime) -> None:
 
 def _load_open_tickets(db: Any, contact: Contact) -> list[OpenTicket]:
     tickets = []
-    for tid in contact.open_ticket_ids:
-        doc = db.collection("tickets").document(tid).get()
-        if doc.exists:
-            data = doc.to_dict()
-            tickets.append(
-                OpenTicket(
-                    ticket_id=tid,
-                    service_id=data.get("serviceId", ""),
-                    service_name=data.get("serviceName", ""),
-                )
+    for ticket_id in contact.open_ticket_ids:
+        doc = db.collection("tickets").document(ticket_id).get()
+        if not doc.exists:
+            continue
+        data = doc.to_dict()
+        tickets.append(
+            OpenTicket(
+                ticket_id=ticket_id,
+                category_id=data.get("categoryId", ""),
+                category_label=data.get("categoryLabel", ""),
+                status=TicketStatus(data.get("status", TicketStatus.OPEN)),
+                created_at=data.get("createdAt") or datetime.now(UTC),
             )
+        )
     return tickets
 
 
-def _load_outbound_map(db: Any, wa_number: str) -> dict[str, str]:
-    try:
-        outbound = (
-            db.collection("contacts")
-            .document(wa_number)
-            .collection("messages")
-            .where("direction", "==", "out")
-            .order_by("createdAt", direction="DESCENDING")
-            .limit(20)
-            .get()
-        )
-    except Exception:
-        return {}
-    return {
-        doc.to_dict().get("messageId", ""): doc.to_dict().get("ticketId", "")
-        for doc in outbound
-        if doc.to_dict().get("messageId") and doc.to_dict().get("ticketId")
-    }
-
-
-def _send_replies(wa_number: str, replies: tuple, db: Any, now: datetime) -> None:
+def _send_replies(
+    wa_number: str,
+    replies: tuple[Reply, ...],
+    db: Any,
+    now: datetime,
+    *,
+    ticket_id: str | None = None,
+) -> None:
     for reply in replies:
         message_id = send_reply(wa_number, reply)
-        text = reply.body if hasattr(reply, "body") else None
-        log_outbound(db, wa_number, message_id, text, now)
+        log_outbound(
+            db,
+            wa_number,
+            message_id,
+            _reply_text(reply),
+            now,
+            ticket_id=ticket_id,
+            sent_via="template" if isinstance(reply, SendTemplate) else "freeform",
+        )
 
 
-def _send_and_log(db: Any, wa_number: str, text: str, ticket_id: str, now: datetime) -> None:
-    message_id = send_text(wa_number, text)
-    log_outbound(db, wa_number, message_id, text, now, ticket_id=ticket_id)
+def _reply_text(reply: Reply) -> str | None:
+    """What to show in the dashboard. A template's wording lives in Gupshup,
+    so record its name and the values we filled in."""
+    if isinstance(reply, SendTemplate):
+        return " · ".join((f"[{reply.name}]", *reply.params))
+    return reply.body
 
 
 def _update_session(db: Any, wa_number: str, session: Any, now: datetime) -> None:
     db.collection("contacts").document(wa_number).update(
         to_firestore({"session": session.model_dump(), "updated_at": now})
     )
-
-
-def _stamp_message(db: Any, message: InboundMessage, ticket_id: str) -> None:
-    db.collection("contacts").document(message.wa_number).collection("messages").document(
-        message.provider_message_id
-    ).update({"ticketId": ticket_id})
 
 
 def _stamp_ticket_on_messages(db: Any, wa_number: str, ticket_id: str, now: datetime) -> None:
@@ -571,86 +513,3 @@ def _stamp_ticket_on_messages(db: Any, wa_number: str, ticket_id: str, now: date
     )
     for doc in unstamped:
         doc.reference.update({"ticketId": ticket_id})
-
-
-def _log_event(db: Any, ticket_id: str, event_type: EventType, now: datetime) -> None:
-    db.collection("tickets").document(ticket_id).collection("events").document().set(
-        to_firestore(
-            {
-                "type": event_type,
-                "from": None,
-                "to": None,
-                "actor": "bot",
-                "actor_uid": None,
-                "note": None,
-                "at": now,
-            }
-        )
-    )
-
-
-def _reopen(db: Any, ticket_id: str, wa_number: str, now: datetime) -> bool:
-    """False when another open ticket already covers this product."""
-    from google.cloud.firestore_v1 import transaction as fs_transaction
-
-    @fs_transaction.transactional
-    def _txn(txn: fs_transaction.Transaction) -> bool:
-        ticket_ref = db.collection("tickets").document(ticket_id)
-        contact_ref = db.collection("contacts").document(wa_number)
-
-        ticket_snap = ticket_ref.get(transaction=txn)
-        contact_snap = contact_ref.get(transaction=txn)
-
-        ticket_data = ticket_snap.to_dict() or {}
-        contact_data = contact_snap.to_dict() or {}
-
-        open_ids: list[str] = contact_data.get("openTicketIds", [])
-        service_id = ticket_data.get("serviceId")
-        for oid in open_ids:
-            other = db.collection("tickets").document(oid).get(transaction=txn)
-            if other.exists and other.to_dict().get("serviceId") == service_id:
-                return False
-
-        txn.update(
-            ticket_ref,
-            to_firestore(
-                {
-                    "status": TicketStatus.OPEN,
-                    "sla_state": "ok",
-                    "sla_started_at": now,
-                    "closed_at": None,
-                    "updated_at": now,
-                }
-            ),
-        )
-
-        recently_closed = [
-            rc for rc in contact_data.get("recentlyClosed", []) if rc.get("ticketId") != ticket_id
-        ]
-        txn.update(
-            contact_ref,
-            {
-                "openTicketIds": open_ids + [ticket_id],
-                "recentlyClosed": recently_closed,
-                "updatedAt": now,
-            },
-        )
-
-        event_ref = ticket_ref.collection("events").document()
-        txn.set(
-            event_ref,
-            to_firestore(
-                {
-                    "type": EventType.STATUS_CHANGED,
-                    "from": TicketStatus.CLOSED,
-                    "to": TicketStatus.OPEN,
-                    "actor": "bot",
-                    "actor_uid": None,
-                    "note": "Reopened by contact",
-                    "at": now,
-                }
-            ),
-        )
-        return True
-
-    return _txn(db.transaction())

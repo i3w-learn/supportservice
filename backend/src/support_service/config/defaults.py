@@ -1,120 +1,120 @@
-"""Seed copy and products.
+"""Seed copy, categories and the approved template names.
 
-Written to Firestore once at setup, then edited there. This module is the
-starting point, not the source of truth at runtime.
+Every prompt the bot sends is one of the WhatsApp templates below (the wording
+lives in Gupshup, not here — see whatsapp-templates.md). The strings in COPY
+are only for the handful of messages that are not templates: the nudge after an
+unrecognised tap, and the regional-language list.
 """
 
-from support_service.config.models import Category, ConfigSnapshot, Service
+from support_service.config.models import Category, ConfigSnapshot
 from support_service.models import Language
 
-EN, HI, TE, TA = Language.EN, Language.HI, Language.TE, Language.TA
+EN, HI, MR, BN = Language.EN, Language.HI, Language.MR, Language.BN
+
+# --- approved templates ---------------------------------------------------
+
+WELCOME_LANGUAGE = "welcome_language_select"
+ISSUE_CATEGORY = "new_user_issue_category"
+RETURNING_OPTIONS = "returning_user_options"
+UPLOAD_MEDIA = "upload_media_request"
+TICKET_STATUS = "ticket_status_update"
+TICKET_CREATED = "ticket_created_confirmation"
+TICKET_RESOLVED = "ticket_resolved"
+
+# --- button labels --------------------------------------------------------
+#
+# A template's quick reply comes back as the button's own text, so these must
+# match the approved templates character for character.
+
+REGIONAL = "regional"
+
+#: The welcome template's three buttons. WhatsApp allows no more, so Marathi
+#: and Bengali sit behind "Regional", which answers with a list — free, because
+#: the contact wrote first.
+LANGUAGE_BUTTONS: tuple[tuple[str, str], ...] = (
+    (EN.value, "English"),
+    (HI.value, "हिन्दी"),
+    (REGIONAL, "Regional"),
+)
+
+LANGUAGE_LABELS = {EN: "English", HI: "हिन्दी", MR: "मराठी", BN: "বাংলা"}
+
+REGIONAL_LANGUAGES = (MR, BN)
+
+NEW_TICKET = "new"
+PREVIOUS_TICKET = "previous"
+UPLOAD_NOW = "upload"
+SKIP = "skip"
 
 COPY: dict[Language, dict[str, str]] = {
     EN: {
-        "ask_language": "Choose your language",
-        "ask_service": "Which product has the problem?",
-        "ask_name": "Please share your name",
-        "ask_centre": "What is your Anganwadi centre called?",
-        "ask_category": "What is the problem?",
-        "ask_description": ("Describe the issue. You can send photos or video too, then tap Done."),
-        "done_button": "Done",
-        "invalid_choice": "Please tap one of the options above.",
-        "invalid_text": "Please send this as a text message.",
-        "ticket_created": "Thank you. Your report has been logged — {ticket_id}",
-        "appended": "Added to your open report {ticket_id}. We are looking into it.",
-        "ask_which_ticket": "Which one is this about?",
-        "new_problem": "Report a new problem",
-        "ask_recently_closed": (
-            "Is this about your {service_name} report {ticket_id}, or a new problem?"
-        ),
-        "yes_same": "Same problem",
-        "reopened": "Reopened {ticket_id}. We are looking into it again.",
+        "invalid_choice": "Please tap one of the buttons above.",
+        "ask_regional": "Please select your language",
+        "new_ticket_button": "New Ticket",
+        "previous_ticket_button": "Previous Ticket",
+        "upload_button": "Upload Now",
+        "skip_button": "Skip",
+        "status_open": "Open",
+        "status_in_progress": "In Progress",
+        "status_resolved": "Resolved",
+        "status_closed": "Closed",
     },
     HI: {
-        "ask_language": "अपनी भाषा चुनें",
-        "ask_service": "किस product में समस्या है?",
-        "ask_name": "कृपया अपना नाम बताएं",
-        "ask_centre": "आपकी आंगनवाड़ी का नाम क्या है?",
-        "ask_category": "क्या समस्या है?",
-        "ask_description": "समस्या बताएं। फोटो या वीडियो भी भेज सकते हैं, फिर Done दबाएं।",
-        "done_button": "हो गया",
-        "invalid_choice": "कृपया ऊपर दिए विकल्पों में से एक चुनें।",
-        "invalid_text": "कृपया इसे टेक्स्ट में भेजें।",
-        "ticket_created": "धन्यवाद। आपकी शिकायत दर्ज हो गई है — {ticket_id}",
-        "appended": "आपकी शिकायत {ticket_id} में जोड़ दिया गया है।",
-        "ask_which_ticket": "यह किस बारे में है?",
-        "new_problem": "नई समस्या बताएं",
-        "ask_recently_closed": "क्या यह आपकी {service_name} शिकायत {ticket_id} के बारे में है?",
-        "yes_same": "वही समस्या",
-        "reopened": "{ticket_id} फिर से खोल दी गई है।",
+        "invalid_choice": "कृपया ऊपर दिए बटनों में से एक दबाएं।",
+        "ask_regional": "कृपया अपनी भाषा चुनें",
+        "new_ticket_button": "नया टिकट",
+        "previous_ticket_button": "पिछला टिकट",
+        "upload_button": "अभी अपलोड करें",
+        "skip_button": "छोड़ें",
+        "status_open": "खुला",
+        "status_in_progress": "काम जारी है",
+        "status_resolved": "हल हो गया",
+        "status_closed": "बंद",
+    },
+    MR: {
+        "invalid_choice": "कृपया वरील बटणांपैकी एक दाबा.",
+        "ask_regional": "कृपया तुमची भाषा निवडा",
+        "new_ticket_button": "नवीन तिकीट",
+        "previous_ticket_button": "मागील तिकीट",
+        "upload_button": "आता पाठवा",
+        "skip_button": "वगळा",
+        "status_open": "उघडे",
+        "status_in_progress": "काम सुरू आहे",
+        "status_resolved": "सुटले",
+        "status_closed": "बंद",
+    },
+    BN: {
+        "invalid_choice": "অনুগ্রহ করে উপরের একটি বোতামে চাপ দিন।",
+        "ask_regional": "অনুগ্রহ করে আপনার ভাষা নির্বাচন করুন",
+        "new_ticket_button": "নতুন টিকিট",
+        "previous_ticket_button": "আগের টিকিট",
+        "upload_button": "এখনই পাঠান",
+        "skip_button": "বাদ দিন",
+        "status_open": "খোলা",
+        "status_in_progress": "কাজ চলছে",
+        "status_resolved": "সমাধান হয়েছে",
+        "status_closed": "বন্ধ",
     },
 }
 
-SERVICES = [
-    Service(
-        id="anganwadi-vr",
-        name={EN: "Anganwadi VR", HI: "आंगनवाड़ी VR", TE: "అంగన్‌వాడీ VR", TA: "அங்கன்வாடி VR"},
+CATEGORIES = [
+    Category(
+        id="device",
+        label={EN: "Device", HI: "डिवाइस", MR: "डिव्हाइस", BN: "ডিভাইস"},
         order=1,
-        categories=[
-            Category(
-                id="headset", label={EN: "Headset not working", HI: "हेडसेट चालू नहीं होता"}, order=1
-            ),
-            Category(
-                id="controller",
-                label={EN: "Controller not pairing", HI: "कंट्रोलर कनेक्ट नहीं होता"},
-                order=2,
-            ),
-            Category(
-                id="content", label={EN: "Content not loading", HI: "कंटेंट लोड नहीं होता"}, order=3
-            ),
-            Category(
-                id="other",
-                label={EN: "Something else", HI: "कुछ और"},
-                order=99,
-            ),
-        ],
     ),
-    Service(
-        id="poshan-ai",
-        name={EN: "Poshan AI", HI: "पोषण AI", TE: "పోషణ్ AI", TA: "போஷண் AI"},
+    Category(
+        id="software",
+        label={EN: "Software", HI: "सॉफ़्टवेयर", MR: "सॉफ्टवेअर", BN: "সফটওয়্যার"},
         order=2,
-        categories=[
-            Category(
-                id="data-loss",
-                label={EN: "Data not saving", HI: "डेटा सेव नहीं होता"},
-                order=1,
-            ),
-            Category(
-                id="crash",
-                label={EN: "App crashes", HI: "ऐप बंद हो जाता है"},
-                order=2,
-            ),
-            Category(
-                id="other",
-                label={EN: "Something else", HI: "कुछ और"},
-                order=99,
-            ),
-        ],
     ),
-    Service(
-        id="german-ai",
-        name={EN: "German AI", HI: "जर्मन AI", TE: "జర్మన్ AI", TA: "ஜெர்மன் AI"},
+    Category(
+        id="other",
+        label={EN: "Other", HI: "अन्य", MR: "इतर", BN: "অন্যান্য"},
         order=3,
-        categories=[
-            Category(
-                id="audio",
-                label={EN: "Audio not playing", HI: "आवाज़ नहीं आती"},
-                order=1,
-            ),
-            Category(
-                id="other",
-                label={EN: "Something else", HI: "कुछ और"},
-                order=99,
-            ),
-        ],
     ),
 ]
 
 
 def seed() -> ConfigSnapshot:
-    return ConfigSnapshot(services=SERVICES, strings=COPY)
+    return ConfigSnapshot(categories=CATEGORIES, strings=COPY)

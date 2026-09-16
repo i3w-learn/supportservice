@@ -1,8 +1,8 @@
 """Ticket lifecycle: creation, status transitions, resolution (§4.3, §8).
 
 Note on module layout: this module and `channel_service` depend on each other
-(`create_ticket` is used by `channel_service.handle_inbound`; `send_text` /
-`send_template` are used by `resolve_ticket` / `resend_resolution` below). To
+(`create_ticket` is used by `channel_service.handle_inbound`; `send_template` /
+`log_outbound` are used by `resolve_ticket` / `resend_resolution` below). To
 let that circular import resolve, each module defines the names the *other*
 module needs before importing from it. Don't reorder the sections below
 without checking `channel_service.py`'s matching comment.
@@ -14,9 +14,9 @@ from datetime import UTC, datetime, timedelta
 
 from google.cloud.firestore_v1 import transaction as fs_transaction
 
-from support_service.config.defaults import seed
+from support_service.config.defaults import TICKET_RESOLVED, seed
 from support_service.conversation.steps import Draft
-from support_service.models import EventType, ProviderStatus, SlaState, TicketStatus
+from support_service.models import EventType, Language, ProviderStatus, SlaState, TicketStatus
 from support_service.repositories.base import get_db, get_doc, to_firestore
 from support_service.services import task_service
 
@@ -46,6 +46,8 @@ def _ticket_id(date: datetime, seq: int) -> str:
 def create_ticket(draft: Draft, wa_number: str, *, now: datetime | None = None) -> str:
     now = now or datetime.now(UTC)
     db = get_db()
+    config = seed()
+    language = Language(draft.language)
 
     @fs_transaction.transactional
     def _txn(txn: fs_transaction.Transaction) -> str:
@@ -61,30 +63,14 @@ def create_ticket(draft: Draft, wa_number: str, *, now: datetime | None = None) 
         contact_data = contact_snap.to_dict() or {}
         open_ids: list[str] = contact_data.get("openTicketIds", [])
 
-        for existing_id in open_ids:
-            existing = db.collection("tickets").document(existing_id).get(transaction=txn)
-            if existing.exists and existing.to_dict().get("serviceId") == draft.service_id:
-                raise ValueError(f"Already open for this product: {existing_id}")
-
-        config_service = db.collection("services").document(draft.service_id).get()
-        service_data = config_service.to_dict() or {}
-        service_name = service_data.get("name", {}).get(draft.language, draft.service_id)
-        category_label = draft.category_id
-        for cat in service_data.get("categories", []):
-            if cat.get("id") == draft.category_id:
-                category_label = cat.get("label", {}).get(draft.language, draft.category_id)
-                break
-
         ticket_data = to_firestore(
             {
                 "wa_number": wa_number,
-                "contact_name": draft.display_name,
-                "centre_name": draft.centre_name,
-                "service_id": draft.service_id,
-                "service_name": service_name,
+                # The WhatsApp profile name — the flow no longer asks for one.
+                "contact_name": contact_data.get("displayName"),
                 "category_id": draft.category_id,
-                "category_label": category_label,
-                "language": draft.language,
+                "category_label": config.category_label(draft.category_id, language),
+                "language": language,
                 "description": draft.description,
                 "attachment_count": 0,
                 "status": TicketStatus.OPEN,
@@ -92,6 +78,7 @@ def create_ticket(draft: Draft, wa_number: str, *, now: datetime | None = None) 
                 "resolution": None,
                 "created_at": now,
                 "updated_at": now,
+                "sla_started_at": now,
                 "first_response_at": None,
                 "resolved_at": None,
                 "closed_at": None,
@@ -141,20 +128,9 @@ def schedule_sla_checks(ticket_id: str, start: datetime) -> None:
 
 
 # `channel_service` needs `create_ticket` / `schedule_sla_checks` above; this
-# module needs `channel_service.send_text` / `send_template` / `log_outbound`
-# below. See module docstring.
-from support_service.services.channel_service import (  # noqa: E402
-    log_outbound,
-    send_template,
-    send_text,
-)
-
-TEMPLATE_NAMES: dict[str, str] = {
-    "en": "i3w_b2g_support_bot_en",
-    "hi": "i3w_b2g_support_bot_hi",
-}
-DEFAULT_TEMPLATE = "i3w_b2g_support_bot_en"
-
+# module needs `channel_service.send_template` / `log_outbound` below.
+# See module docstring.
+from support_service.services.channel_service import log_outbound, send_template  # noqa: E402
 
 # --- resolution — send and manage the resolved/closed lifecycle (§4.3) ----
 
@@ -167,29 +143,21 @@ def resolve_ticket(ticket_id: str, text: str, actor_uid: str) -> str:
     current = TicketStatus(ticket["status"])
     validate_transition(current, TicketStatus.RESOLVED)
 
-    wa_number = ticket["wa_number"]
-    contact = get_doc("contacts", wa_number)
-    last_inbound = contact.get("last_inbound_at") if contact else None
-
     now = datetime.now(UTC)
-    window = timedelta(hours=24)
-    inside_window = last_inbound and (now - last_inbound) < window
-
-    if inside_window:
-        message_id = send_text(wa_number, text)
-        sent_via = "freeform"
-    else:
-        language = ticket.get("language", "en")
-        contact_name = ticket.get("contact_name", "")
-        params = [contact_name, ticket_id, text]
-        template = TEMPLATE_NAMES.get(language, DEFAULT_TEMPLATE)
-        message_id = send_template(wa_number, template, language, params)
-        sent_via = "template"
+    message_id = _send_resolution(ticket, ticket_id, text)
 
     db = get_db()
     # The delivery receipt closes the ticket by looking this record up by
     # message id (webhook_controller), so the send must be recorded.
-    log_outbound(db, wa_number, message_id, text, now, ticket_id=ticket_id, sent_via=sent_via)
+    log_outbound(
+        db,
+        ticket["wa_number"],
+        message_id,
+        text,
+        now,
+        ticket_id=ticket_id,
+        sent_via="template",
+    )
 
     ticket_ref = db.collection("tickets").document(ticket_id)
     ticket_ref.update(
@@ -216,7 +184,7 @@ def resolve_ticket(ticket_id: str, text: str, actor_uid: str) -> str:
                 "to": TicketStatus.RESOLVED,
                 "actor": "admin",
                 "actor_uid": actor_uid,
-                "note": f"Sent as {sent_via}",
+                "note": "Sent as template",
                 "at": now,
             }
         )
@@ -246,27 +214,19 @@ def resend_resolution(ticket_id: str, actor_uid: str) -> str:
         raise ValueError(f"Ticket {ticket_id} has no resolution to resend")
 
     text = resolution["text"]
-    wa_number = ticket["wa_number"]
-    contact = get_doc("contacts", wa_number)
-    last_inbound = contact.get("last_inbound_at") if contact else None
-
     now = datetime.now(UTC)
-    window = timedelta(hours=24)
-    inside_window = last_inbound and (now - last_inbound) < window
-
-    if inside_window:
-        message_id = send_text(wa_number, text)
-        sent_via = "freeform"
-    else:
-        language = ticket.get("language", "en")
-        contact_name = ticket.get("contact_name", "")
-        params = [contact_name, ticket_id, text]
-        template = TEMPLATE_NAMES.get(language, DEFAULT_TEMPLATE)
-        message_id = send_template(wa_number, template, language, params)
-        sent_via = "template"
+    message_id = _send_resolution(ticket, ticket_id, text)
 
     db = get_db()
-    log_outbound(db, wa_number, message_id, text, now, ticket_id=ticket_id, sent_via=sent_via)
+    log_outbound(
+        db,
+        ticket["wa_number"],
+        message_id,
+        text,
+        now,
+        ticket_id=ticket_id,
+        sent_via="template",
+    )
 
     ticket_ref = db.collection("tickets").document(ticket_id)
     ticket_ref.update(
@@ -291,13 +251,20 @@ def resend_resolution(ticket_id: str, actor_uid: str) -> str:
                 "to": current,
                 "actor": "admin",
                 "actor_uid": actor_uid,
-                "note": f"Resent as {sent_via}",
+                "note": "Resent as template",
                 "at": now,
             }
         )
     )
 
     return message_id
+
+
+def _send_resolution(ticket: dict, ticket_id: str, text: str) -> str:
+    """Always the approved template: the admin usually replies hours later,
+    long after the 24-hour window free text needs (§4.3)."""
+    language = ticket.get("language") or Language.EN.value
+    return send_template(ticket["wa_number"], TICKET_RESOLVED, language, [ticket_id, text])
 
 
 # --- SLA — one delayed check per deadline, scheduled at creation (§11) -----
@@ -312,6 +279,7 @@ def check_sla(ticket_id: str, *, now: datetime | None = None) -> SlaState | None
     data = snap.to_dict() if snap.exists else None
     if not data or data.get("status") not in (TicketStatus.OPEN, TicketStatus.IN_PROGRESS):
         return None
+
     # A reopened ticket's clock restarts at the reopen, not at creation.
     started = data.get("slaStartedAt") or data.get("createdAt")
     if not started:

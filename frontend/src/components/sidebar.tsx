@@ -3,8 +3,8 @@ import { AlertTriangle, LayoutGrid } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
-import { SERVICES } from "@/lib/types"
-import type { ServiceId, Ticket } from "@/lib/types"
+import { CATEGORIES } from "@/lib/types"
+import type { CategoryId, Ticket } from "@/lib/types"
 
 export type ViewKey = "all" | "attention"
 
@@ -20,13 +20,13 @@ const VIEWS: { key: ViewKey; label: string; Icon: typeof LayoutGrid }[] = [
 interface Props {
   tickets: Ticket[]
   view: ViewKey
-  service: ServiceId | "all"
+  category: CategoryId | "all"
   onView: (key: ViewKey) => void
-  onService: (id: ServiceId | "all") => void
+  onCategory: (id: CategoryId | "all") => void
 }
 
-export function Sidebar({ tickets, view, service, onView, onService }: Props) {
-  const inService = (t: Ticket) => service === "all" || t.serviceId === service
+export function Sidebar({ tickets, view, category, onView, onCategory }: Props) {
+  const inCategory = (t: Ticket) => category === "all" || t.categoryId === category
 
   return (
     <nav className="flex w-52 shrink-0 flex-col gap-5 overflow-y-auto border-r px-2.5 py-4">
@@ -37,8 +37,8 @@ export function Sidebar({ tickets, view, service, onView, onService }: Props) {
         {VIEWS.map(({ key, label, Icon }) => {
           const count =
             key === "attention"
-              ? tickets.filter((t) => needsAttention(t) && inService(t)).length
-              : tickets.filter(inService).length
+              ? tickets.filter((t) => needsAttention(t) && inCategory(t)).length
+              : tickets.filter(inCategory).length
           const active = view === key
           return (
             <Button
@@ -70,22 +70,22 @@ export function Sidebar({ tickets, view, service, onView, onService }: Props) {
 
       <div className="flex flex-col gap-0.5">
         <p className="px-2 pb-1.5 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-          Product
+          Category
         </p>
         {(
           [
-            ["all", "All products"],
-            ...Object.entries(SERVICES).map(([id, s]) => [id, s.name] as const),
-          ] as [ServiceId | "all", string][]
+            ["all", "All categories"],
+            ...Object.entries(CATEGORIES).map(([id, c]) => [id, c.name] as const),
+          ] as [CategoryId | "all", string][]
         ).map(([id, label]) => {
-          const active = service === id
+          const active = category === id
           const count =
-            id === "all" ? tickets.length : tickets.filter((t) => t.serviceId === id).length
+            id === "all" ? tickets.length : tickets.filter((t) => t.categoryId === id).length
           return (
             <Button
               key={id}
               variant="ghost"
-              onClick={() => onService(id)}
+              onClick={() => onCategory(id)}
               aria-pressed={active}
               className={cn(
                 "h-8 justify-start gap-2 px-2 font-normal",
@@ -96,7 +96,9 @@ export function Sidebar({ tickets, view, service, onView, onService }: Props) {
                 className="size-2 shrink-0 rounded-[2px]"
                 style={{
                   background:
-                    id === "all" ? "var(--color-muted-foreground)" : SERVICES[id as ServiceId].color,
+                    id === "all"
+                      ? "var(--color-muted-foreground)"
+                      : CATEGORIES[id as CategoryId].color,
                 }}
                 aria-hidden
               />

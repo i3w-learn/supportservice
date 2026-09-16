@@ -10,7 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react"
 
-import { FailedLozenge, ServiceTag, SlaLozenge, StatusLozenge } from "@/components/lozenge"
+import { CategoryTag, FailedLozenge, SlaLozenge, StatusLozenge } from "@/components/lozenge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/lib/api"
 import { cn } from "@/lib/utils"
-import { LANGUAGES, SERVICES, TEMPLATES } from "@/lib/types"
+import { LANGUAGES, TEMPLATES } from "@/lib/types"
 import type { Message, Ticket, TicketEvent } from "@/lib/types"
 import { clockTime, dayLabel, formatCountdown, relativeTime, replyWindow } from "@/lib/window"
 
@@ -30,6 +30,12 @@ interface Props {
   onResend: (id: string) => void
   /** Set when a drag onto "Awaiting delivery" needs a resolution written. */
   startComposing?: boolean
+}
+
+/** Who the admin is writing to. The template flow never asks for a name, so
+ *  most tickets only have the number. */
+function who(ticket: Ticket): string {
+  return ticket.contactName ?? `+${ticket.waNumber}`
 }
 
 export function TicketDetail({
@@ -87,12 +93,14 @@ export function TicketDetail({
           {ticket.categoryLabel}
         </h1>
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
-          <ServiceTag name={ticket.serviceName} color={SERVICES[ticket.serviceId].color} />
+          <CategoryTag category={ticket.categoryId} />
           <span aria-hidden>·</span>
-          <span className="font-medium text-foreground">{ticket.contactName}</span>
-          <span aria-hidden>·</span>
-          <span>{ticket.centreName}</span>
-          <span aria-hidden>·</span>
+          {ticket.contactName && (
+            <>
+              <span className="font-medium text-foreground">{ticket.contactName}</span>
+              <span aria-hidden>·</span>
+            </>
+          )}
           <span className="font-mono">+{ticket.waNumber}</span>
           <span aria-hidden>·</span>
           <span>{LANGUAGES[ticket.language]}</span>
@@ -194,7 +202,7 @@ export function TicketDetail({
                 <Textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder={`What did you do to fix it? This goes to ${ticket.contactName} on WhatsApp.`}
+                  placeholder={`What did you do to fix it? This goes to ${who(ticket)} on WhatsApp.`}
                   className="min-h-20"
                 />
                 <div>
@@ -273,7 +281,7 @@ function SendModeNotice({ ticket }: { ticket: Ticket }) {
     <div className="flex gap-2 rounded-md bg-emerald-50 p-2.5 text-xs text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200">
       <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
       <p>
-        <b className="font-semibold">Sends as free text.</b> {ticket.contactName} wrote{" "}
+        <b className="font-semibold">Sends as free text.</b> {who(ticket)} wrote{" "}
         {relativeTime(ticket.lastInboundAt)}, so the window is still open.
       </p>
     </div>

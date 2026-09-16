@@ -26,7 +26,7 @@ import { useAuth } from "@/lib/auth"
 import { useTicketDetail, useTickets } from "@/lib/firestore"
 import { nextId } from "@/lib/mock"
 import { checkTransition } from "@/lib/transitions"
-import type { ServiceId, Ticket, TicketStatus } from "@/lib/types"
+import type { CategoryId, Ticket, TicketStatus } from "@/lib/types"
 import { replyWindow } from "@/lib/window"
 
 export default function App() {
@@ -41,7 +41,7 @@ export default function App() {
     if (!demo) setTickets(liveTickets)
   }, [demo, liveTickets])
 
-  const [service, setService] = useState<ServiceId | "all">("all")
+  const [category, setCategory] = useState<CategoryId | "all">("all")
   const [view, setView] = useState<ViewKey>("all")
   const [query, setQuery] = useState("")
   const [openId, setOpenId] = useState<string | null>(null)
@@ -58,14 +58,14 @@ export default function App() {
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return tickets.filter((t) => {
-      if (service !== "all" && t.serviceId !== service) return false
+      if (category !== "all" && t.categoryId !== category) return false
       if (view === "attention" && !needsAttention(t)) return false
       if (!needle) return true
-      return `${t.ticketId} ${t.contactName} ${t.centreName} ${t.categoryLabel} ${t.description}`
+      return `${t.ticketId} ${t.waNumber} ${t.contactName ?? ""} ${t.categoryLabel} ${t.description}`
         .toLowerCase()
         .includes(needle)
     })
-  }, [tickets, service, view, query])
+  }, [tickets, category, view, query])
 
   const selectedTicket = tickets.find((t) => t.ticketId === openId) ?? null
   // In live mode the ticket doc itself carries no messages/events — those
@@ -412,9 +412,9 @@ export default function App() {
           <Sidebar
             tickets={tickets}
             view={view}
-            service={service}
+            category={category}
             onView={setView}
-            onService={setService}
+            onCategory={setCategory}
           />
 
           <main className="min-h-0 flex-1 pt-4">

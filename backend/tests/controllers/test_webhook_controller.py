@@ -9,7 +9,6 @@ the secret check and the delivery-receipt / auto-close flow that lives in
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -184,16 +183,7 @@ class TestDeliveryAutoClose:
 
         contact_snapshot = MagicMock()
         contact_snapshot.exists = True
-        contact_snapshot.to_dict.return_value = {
-            "openTicketIds": [TICKET_ID, "TKT-other"],
-            "recentlyClosed": [
-                {
-                    "ticketId": "TKT-stale",
-                    "serviceId": "poshan-ai",
-                    "closedAt": datetime.now(UTC) - timedelta(days=30),
-                }
-            ],
-        }
+        contact_snapshot.to_dict.return_value = {"openTicketIds": [TICKET_ID, "TKT-other"]}
         mock_db.collection("contacts").document.return_value.get.return_value = contact_snapshot
 
         response = client.post("/webhook/gupshup", json=_status_event("delivered"))
@@ -213,5 +203,3 @@ class TestDeliveryAutoClose:
         contact_ref = mock_db.collection("contacts").document.return_value
         contact_update = contact_ref.update.call_args.args[0]
         assert contact_update["openTicketIds"] == ["TKT-other"]
-        # The stale entry is past the reopen window and gets dropped.
-        assert [e["ticketId"] for e in contact_update["recentlyClosed"]] == [TICKET_ID]

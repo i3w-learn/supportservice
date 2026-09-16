@@ -2,7 +2,7 @@
 
 import os
 
-from support_service.config.defaults import COPY, SERVICES, seed
+from support_service.config.defaults import CATEGORIES, COPY, seed
 from support_service.controllers.auth_controller import hash_password
 from support_service.repositories.base import get_db, to_firestore
 
@@ -10,8 +10,8 @@ from support_service.repositories.base import get_db, to_firestore
 def run_seed() -> None:
     db = get_db()
 
-    for service in SERVICES:
-        db.collection("services").document(service.id).set(to_firestore(service.model_dump()))
+    for category in CATEGORIES:
+        db.collection("categories").document(category.id).set(to_firestore(category.model_dump()))
 
     for lang, strings in COPY.items():
         db.collection("config").document("copy").collection(lang.value).document("strings").set(
@@ -37,7 +37,7 @@ def run_seed() -> None:
         )
         print(f"  Admin: {admin_email}")
 
-    print(f"Seeded {len(SERVICES)} services, {len(COPY)} language packs, settings, 1 admin")
+    print(f"Seeded {len(CATEGORIES)} categories, {len(COPY)} language packs, settings, 1 admin")
 
 
 if __name__ == "__main__":

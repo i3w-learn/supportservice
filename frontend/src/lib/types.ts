@@ -3,8 +3,8 @@
 
 export type TicketStatus = "open" | "in_progress" | "resolved" | "closed"
 export type SlaState = "ok" | "reminder_due" | "breached"
-export type Lang = "en" | "hi" | "te" | "ta"
-export type ServiceId = "anganwadi-vr" | "german-ai" | "poshan-ai"
+export type Lang = "en" | "hi" | "mr" | "bn"
+export type CategoryId = "device" | "software" | "other"
 
 export type AttachmentState = "pending" | "stored" | "failed"
 export type SentVia = "freeform" | "template"
@@ -59,11 +59,11 @@ export interface Resolution {
 export interface Ticket {
   ticketId: string
   waNumber: string
-  contactName: string
-  centreName: string
-  serviceId: ServiceId
-  serviceName: string
-  categoryId: string
+  /** Null unless the contact gave a name in an earlier flow — the template
+   *  flow never asks for one. */
+  contactName: string | null
+  categoryId: CategoryId
+  /** The category as the contact saw it, in their own language. */
   categoryLabel: string
   language: Lang
   description: string
@@ -78,22 +78,24 @@ export interface Ticket {
   closedAt: number | null
   /** Load-bearing: decides free text vs approved template (§5). */
   lastInboundAt: number
+  /** Written when a ticket is reopened — the deadline clock restarts here. */
+  slaStartedAt?: number
   /** Optional: these live in subcollections and are hydrated separately. */
   messages?: Message[]
   events?: TicketEvent[]
 }
 
-export const SERVICES: Record<ServiceId, { name: string; color: string }> = {
-  "anganwadi-vr": { name: "Anganwadi VR", color: "#7C5BD4" },
-  "poshan-ai": { name: "Poshan AI", color: "#1E8F6B" },
-  "german-ai": { name: "German AI", color: "#C2762A" },
+export const CATEGORIES: Record<CategoryId, { name: string; color: string }> = {
+  device: { name: "Device", color: "#C2762A" },
+  software: { name: "Software", color: "#7C5BD4" },
+  other: { name: "Other", color: "#3E8FA8" },
 }
 
 export const LANGUAGES: Record<Lang, string> = {
   en: "English",
   hi: "हिन्दी",
-  te: "తెలుగు",
-  ta: "தமிழ்",
+  mr: "मराठी",
+  bn: "বাংলা",
 }
 
 export const STATUS_LABEL: Record<TicketStatus, string> = {
@@ -103,12 +105,13 @@ export const STATUS_LABEL: Record<TicketStatus, string> = {
   closed: "Closed",
 }
 
-/** Approved Meta templates, one per language. Used once the 24h window closes. */
+/** The approved `ticket_resolved` template, one per language. Used once the
+ *  24h window closes: {{1}} is the ticket ID, {{2}} the admin's text. */
 export const TEMPLATES: Record<Lang, string> = {
-  hi: "नमस्ते {{1}}, आपकी शिकायत {{2}} का समाधान हो गया है।\n{{3}}\n— i3w सहायता",
-  en: "Hello {{1}}, your report {{2}} has been resolved.\n{{3}}\n— i3w Support",
-  te: "నమస్కారం {{1}}, మీ ఫిర్యాదు {{2}} పరిష్కరించబడింది.\n{{3}}\n— i3w సహాయం",
-  ta: "வணக்கம் {{1}}, உங்கள் புகார் {{2}} தீர்க்கப்பட்டது.\n{{3}}\n— i3w உதவி",
+  en: 'Hi! 👋 Your support ticket has been resolved.\n\n🎫 Ticket ID: {{1}}\n📋 Resolution: {{2}}\n\nIf you still face any issues, simply send us "Hi" again and we\'ll help you right away.',
+  hi: 'नमस्ते! 👋 आपके सपोर्ट टिकट का समाधान हो गया है।\n\n🎫 टिकट ID: {{1}}\n📋 समाधान: {{2}}\n\nअगर आपको अभी भी कोई समस्या है, तो बस हमें फिर से "Hi" भेजें और हम तुरंत आपकी मदद करेंगे।',
+  mr: 'नमस्कार! 👋 तुमच्या सपोर्ट तिकिटाचे निराकरण झाले आहे.\n\n🎫 तिकीट ID: {{1}}\n📋 समाधान: {{2}}\n\nतरीही काही अडचण असल्यास, आम्हाला पुन्हा "Hi" पाठवा, आम्ही लगेच मदत करू.',
+  bn: 'নমস্কার! 👋 আপনার সাপোর্ট টিকিটের সমাধান হয়েছে।\n\n🎫 টিকিট ID: {{1}}\n📋 সমাধান: {{2}}\n\nএখনও সমস্যা থাকলে আবার "Hi" পাঠান, আমরা সঙ্গে সঙ্গে সাহায্য করব।',
 }
 
 export const WHATSAPP_WINDOW_HOURS = 24

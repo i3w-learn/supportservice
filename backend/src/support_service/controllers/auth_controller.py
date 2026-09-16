@@ -34,7 +34,7 @@ def login(body: LoginBody) -> dict:
         raise HTTPException(401, "Invalid email or password")
 
     admin_doc = docs[0]
-    data = admin_doc.to_dict()
+    data = admin_doc.to_dict() or {}
 
     if not hmac.compare_digest(data.get("passwordHash", ""), hash_password(body.password)):
         raise HTTPException(401, "Invalid email or password")
@@ -45,6 +45,6 @@ def login(body: LoginBody) -> dict:
     return {
         "token": token.decode() if isinstance(token, bytes) else token,
         "uid": uid,
-        "email": data["email"],
+        "email": data.get("email", body.email),
         "displayName": data.get("displayName", "Admin"),
     }

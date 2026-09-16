@@ -7,14 +7,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from support_service.config import defaults
 from support_service.config.defaults import seed
-from support_service.conversation.steps import Draft
+from support_service.conversation.steps import Draft, SendTemplate
 from support_service.models import Language
 from support_service.services import channel_service as handle_module
 from support_service.services.channel_service import finish_idle_session
 
 WA = "919876500001"
-IDLE = timedelta(seconds=seed().settings.description_idle_seconds)
+IDLE = timedelta(seconds=seed().settings.media_idle_seconds)
 
 
 @pytest.fixture
@@ -28,15 +29,15 @@ def db(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
 @pytest.fixture
 def create(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
-    mock = MagicMock(return_value="TKT-20260911-0003")
+    mock = MagicMock(return_value="TKT-20260916-0003")
     monkeypatch.setattr(handle_module, "create_ticket", mock)
     return mock
 
 
 @pytest.fixture
-def send(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+def sent(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock = MagicMock(return_value="gs-1")
-    monkeypatch.setattr(handle_module, "send_text", mock)
+    monkeypatch.setattr(handle_module, "send_reply", mock)
     return mock
 
 
@@ -47,45 +48,40 @@ def _contact_with(db: MagicMock, session: dict[str, object] | None) -> MagicMock
     return ref
 
 
-def _session(
-    *, idle_for: timedelta, description: str = "Headset won't charge", **extra: str
-) -> dict:
+def _session(*, idle_for: timedelta, **draft: str) -> dict:
     at = datetime.now(UTC) - idle_for
     return {
         "flow": "report",
-        "step": "description",
-        "draft": {
-            "language": "en",
-            "serviceId": "anganwadi-vr",
-            "categoryId": "headset",
-            "displayName": "Asha",
-            "centreName": "Ward 4",
-            "description": description,
-            **extra,
-        },
+        "step": "media",
+        "draft": {"language": "en", "categoryId": "device", **draft},
         "startedAt": at,
         "lastActivityAt": at,
     }
 
 
-def test_idle_description_becomes_a_ticket(
-    db: MagicMock, create: MagicMock, send: MagicMock
+def test_a_contact_who_never_sent_a_photo_still_gets_a_ticket(
+    db: MagicMock, create: MagicMock, sent: MagicMock
 ) -> None:
     _contact_with(db, _session(idle_for=IDLE + timedelta(seconds=10)))
 
-    assert finish_idle_session(WA) == "TKT-20260911-0003"
+    assert finish_idle_session(WA) == "TKT-20260916-0003"
 
-    draft, wa = create.call_args.args
-    assert wa == WA
-    assert draft == Draft(
-        language=Language.EN,
-        service_id="anganwadi-vr",
-        category_id="headset",
-        display_name="Asha",
-        centre_name="Ward 4",
-        description="Headset won't charge",
-    )
-    assert "TKT-20260911-0003" in send.call_args.args[1]
+    draft, wa_number = create.call_args.args
+    assert wa_number == WA
+    assert draft == Draft(language=Language.EN, category_id="device", description="")
+
+    confirmation = sent.call_args.args[1]
+    assert isinstance(confirmation, SendTemplate)
+    assert confirmation.name == defaults.TICKET_CREATED
+    assert confirmation.params == ("TKT-20260916-0003", "Device", f"+{WA}")
+
+
+def test_a_typed_description_is_kept(db: MagicMock, create: MagicMock, sent: MagicMock) -> None:
+    _contact_with(db, _session(idle_for=IDLE * 2, description="headset dead"))
+
+    finish_idle_session(WA)
+
+    assert create.call_args.args[0].description == "headset dead"
 
 
 def test_contact_still_typing_is_left_alone(db: MagicMock, create: MagicMock) -> None:
@@ -97,34 +93,19 @@ def test_contact_still_typing_is_left_alone(db: MagicMock, create: MagicMock) ->
     ref.update.assert_not_called()
 
 
-def test_no_session_means_done_was_already_tapped(db: MagicMock, create: MagicMock) -> None:
+def test_no_session_means_the_flow_already_finished(db: MagicMock, create: MagicMock) -> None:
     _contact_with(db, None)
 
     assert finish_idle_session(WA) is None
     create.assert_not_called()
 
 
-def test_nothing_said_closes_the_session_without_a_ticket(db: MagicMock, create: MagicMock) -> None:
-    ref = _contact_with(db, _session(idle_for=IDLE * 2, description=""))
+def test_without_a_category_there_is_nothing_to_file(db: MagicMock, create: MagicMock) -> None:
+    session = _session(idle_for=IDLE * 2)
+    session["draft"] = {"language": "en"}
+    ref = _contact_with(db, session)
 
     assert finish_idle_session(WA) is None
 
     create.assert_not_called()
-    assert ref.update.call_args.args[0]["session"] is None
-
-
-def test_photos_alone_become_a_ticket(db: MagicMock, create: MagicMock, send: MagicMock) -> None:
-    _contact_with(db, _session(idle_for=IDLE * 2, description="", hasMedia="yes"))
-
-    assert finish_idle_session(WA) == "TKT-20260911-0003"
-    assert create.call_args.args[0].description == ""
-
-
-def test_open_ticket_for_the_same_product_closes_the_session(
-    db: MagicMock, create: MagicMock
-) -> None:
-    ref = _contact_with(db, _session(idle_for=IDLE * 2))
-    create.side_effect = ValueError("Already open for this product")
-
-    assert finish_idle_session(WA) is None
     assert ref.update.call_args.args[0]["session"] is None

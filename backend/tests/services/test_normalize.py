@@ -133,3 +133,22 @@ def test_reply_context() -> None:
     }
     msg = normalize(payload)
     assert msg.context_message_id == "wamid.OUT999"
+
+
+def test_the_whatsapp_profile_name_is_captured() -> None:
+    """The flow never asks for a name, so this is the only one we get."""
+    payload = {
+        "app": "TestApp",
+        "timestamp": 1725888000000,
+        "version": 2,
+        "type": "message",
+        "payload": {
+            "id": "wamid.ABC128",
+            "source": "919876543210",
+            "type": "text",
+            "payload": {"text": "Hi"},
+            "sender": {"phone": "919876543210", "name": "Sunita Devi"},
+        },
+    }
+
+    assert normalize(payload).sender_name == "Sunita Devi"

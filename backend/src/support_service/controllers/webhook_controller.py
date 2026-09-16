@@ -9,7 +9,6 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Response
 
-from support_service.conversation.routing import REOPEN_WINDOW
 from support_service.models import EventType, ProviderStatus, TicketStatus
 from support_service.repositories.base import get_db, to_firestore
 from support_service.repositories.contact_repository import contact_ref as _contact_ref
@@ -132,26 +131,7 @@ def _try_close_on_delivery(gs_id: str) -> None:
         if contact_snap.exists:
             contact_data = contact_snap.to_dict()
             open_ids = [oid for oid in contact_data.get("openTicketIds", []) if oid != ticket_id]
-            # Drop entries past the reopen window while this document is being written anyway.
-            recently_closed = [
-                entry
-                for entry in contact_data.get("recentlyClosed", [])
-                if entry.get("closedAt") and now - entry["closedAt"] <= REOPEN_WINDOW
-            ]
-            recently_closed.append(
-                {
-                    "ticketId": ticket_id,
-                    "serviceId": ticket_data.get("serviceId"),
-                    "closedAt": now,
-                }
-            )
-            contact_ref.update(
-                {
-                    "openTicketIds": open_ids,
-                    "recentlyClosed": recently_closed,
-                    "updatedAt": now,
-                }
-            )
+            contact_ref.update({"openTicketIds": open_ids, "updatedAt": now})
 
 
 def _mark_resolution_failed(gs_id: str) -> None:

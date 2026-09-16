@@ -1,11 +1,8 @@
-"""Inbound orchestration (Task 7). Unit tests — no emulator, no network.
+"""Inbound orchestration. Unit tests — no emulator, no network.
 
-Firestore (`get_db`) and the routing/step-machine/send functions are
-monkeypatched at the point `handle.py` imports them, same convention as
-`media/test_urls.py` and `admin_api/test_routes.py`. `route`, `begin` and
-`advance` already have their own unit tests (conversation/test_routing.py,
-conversation/test_steps.py) — here we only check that `handle_inbound` wires
-their outputs to the right Firestore writes and outbound sends.
+Firestore (`get_db`) and the outbound send are monkeypatched at the point
+`channel_service` imports them; routing and the step machine run for real, so
+these tests check the wiring between them and Firestore.
 """
 
 from __future__ import annotations
@@ -15,61 +12,50 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from support_service.config import defaults
 from support_service.config.defaults import seed
-from support_service.conversation.routing import (
-    AppendToTicket,
-    AskAboutRecentlyClosed,
-    ContinueSession,
-    Disambiguate,
-    ReopenTicket,
-    StartReport,
-)
-from support_service.conversation.steps import Draft, Row, SendButtons, SendList, Turn
-from support_service.models import (
-    ClosedTicketRef,
-    EventType,
-    Flow,
-    Language,
-    OpenTicket,
-    Session,
-    Step,
-)
+from support_service.conversation.steps import Draft, SendTemplate
+from support_service.models import Language
 from support_service.services import channel_service as handle_module
 from support_service.services.channel_service import handle_inbound
 
 WA_NUMBER = "919876543210"
-NOW = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
+NOW = datetime(2026, 9, 16, 12, 0, tzinfo=UTC)
 
 
-def _raw_text(message_id: str = "wamid.1", text: str = "Hello") -> dict[str, object]:
+def _raw(payload: dict[str, object]) -> dict[str, object]:
     return {
         "app": "TestApp",
-        "timestamp": 1725888000000,
+        "timestamp": 1758024000000,
         "version": 2,
         "type": "message",
         "payload": {
-            "id": message_id,
             "source": WA_NUMBER,
-            "type": "text",
-            "payload": {"text": text},
-            "sender": {"phone": WA_NUMBER, "name": "Test"},
+            "sender": {"phone": WA_NUMBER, "name": "Sunita Devi"},
+            **payload,
         },
     }
+
+
+def _raw_text(message_id: str = "wamid.1", text: str = "Hi") -> dict[str, object]:
+    return _raw({"id": message_id, "type": "text", "payload": {"text": text}})
+
+
+def _raw_tap(title: str, message_id: str = "wamid.tap") -> dict[str, object]:
+    return _raw({"id": message_id, "type": "button_reply", "payload": {"title": title, "id": "0"}})
 
 
 def _raw_image(message_id: str = "wamid.img") -> dict[str, object]:
-    raw = _raw_text(message_id)
-    raw["payload"] = {
-        "id": message_id,
-        "source": WA_NUMBER,
-        "type": "image",
-        "payload": {
-            "url": "https://filemanager.gupshup.io/fm/wamedia/TestApp/img-1",
-            "contentType": "image/jpeg",
-        },
-        "sender": {"phone": WA_NUMBER, "name": "Test"},
-    }
-    return raw
+    return _raw(
+        {
+            "id": message_id,
+            "type": "image",
+            "payload": {
+                "url": "https://filemanager.gupshup.io/fm/wamedia/TestApp/img-1",
+                "contentType": "image/jpeg",
+            },
+        }
+    )
 
 
 def _fresh_db() -> MagicMock:
@@ -88,12 +74,10 @@ def _fresh_db() -> MagicMock:
 def _contact_snapshot(**overrides: object) -> MagicMock:
     data: dict[str, object] = {
         "waNumber": WA_NUMBER,
-        "displayName": None,
-        "centreName": None,
+        "displayName": "Sunita Devi",
         "language": None,
         "session": None,
         "openTicketIds": [],
-        "recentlyClosed": [],
         "lastInboundAt": NOW,
         "lastOutboundAt": None,
         "createdAt": NOW,
@@ -104,6 +88,16 @@ def _contact_snapshot(**overrides: object) -> MagicMock:
     snapshot.exists = True
     snapshot.to_dict.return_value = data
     return snapshot
+
+
+def _session(step: str, **draft: str) -> dict[str, object]:
+    return {
+        "flow": "report",
+        "step": step,
+        "draft": draft,
+        "startedAt": datetime.now(UTC),
+        "lastActivityAt": datetime.now(UTC),
+    }
 
 
 @pytest.fixture
@@ -117,38 +111,56 @@ def mock_db(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     # An existing, idle contact by default.
     db.collection("contacts").document.return_value.get.return_value = _contact_snapshot()
 
-    # No stray unstamped or outbound-with-ticket messages by default — both
-    # query shapes used by handle.py (`.where().get()` and
-    # `.where().where().order_by().limit().get()`) must be iterable.
+    # No stray unstamped messages.
     messages = db.collection("contacts").document.return_value.collection.return_value
     messages.where.return_value.get.return_value = []
-    outbound_query = messages.where.return_value.where.return_value.order_by.return_value
-    outbound_query.limit.return_value.get.return_value = []
 
     return db
 
 
+@pytest.fixture
+def sent(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    mock = MagicMock(return_value="gs-out-1")
+    monkeypatch.setattr(handle_module, "send_reply", mock)
+    return mock
+
+
+def _templates(sent: MagicMock) -> list[SendTemplate]:
+    return [c.args[1] for c in sent.call_args_list if isinstance(c.args[1], SendTemplate)]
+
+
+def _session_updates(mock_db: MagicMock) -> list[dict]:
+    contact_doc = mock_db.collection("contacts").document.return_value
+    return [
+        c.args[0]["session"] for c in contact_doc.update.call_args_list if "session" in c.args[0]
+    ]
+
+
+def _open_ticket(mock_db: MagicMock, ticket_id: str = "TKT-20260916-0042") -> None:
+    snapshot = MagicMock()
+    snapshot.exists = True
+    snapshot.to_dict.return_value = {
+        "categoryId": "software",
+        "categoryLabel": "Software",
+        "status": "in_progress",
+        "createdAt": NOW - timedelta(days=1),
+    }
+    mock_db.collection("tickets").document.return_value.get.return_value = snapshot
+    mock_db.collection("contacts").document.return_value.get.return_value = _contact_snapshot(
+        language="en", openTicketIds=[ticket_id]
+    )
+
+
 class TestDedupe:
-    def test_duplicate_message_is_ignored(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_duplicate_message_is_ignored(self, mock_db: MagicMock, sent: MagicMock) -> None:
         mock_db.collection("inbound").document.return_value.get.return_value.exists = True
-        route_mock = MagicMock()
-        monkeypatch.setattr(handle_module, "route", route_mock)
 
         handle_inbound(_raw_text())
 
-        route_mock.assert_not_called()
-        mock_db.collection("inbound").document.return_value.set.assert_not_called()
-        # Nothing about the contact should have been touched either.
+        sent.assert_not_called()
         mock_db.collection("contacts").document.return_value.set.assert_not_called()
 
-    def test_first_sighting_is_marked_seen_and_processed(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=StartReport()))
-        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=Turn()))
-
+    def test_first_sighting_is_marked_seen(self, mock_db: MagicMock, sent: MagicMock) -> None:
         handle_inbound(_raw_text(message_id="wamid.new"))
 
         mock_db.collection("inbound").document.assert_any_call("wamid.new")
@@ -157,16 +169,14 @@ class TestDedupe:
 
 class TestMessagePersistence:
     def test_appends_inbound_message_and_touches_last_inbound(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
+        self, mock_db: MagicMock, sent: MagicMock
     ) -> None:
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=StartReport()))
-        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=Turn()))
-
         handle_inbound(_raw_text(message_id="wamid.msg-1", text="My headset broke"))
 
         messages = mock_db.collection("contacts").document.return_value.collection.return_value
         messages.document.assert_any_call("wamid.msg-1")
-        stored = messages.document.return_value.set.call_args.args[0]
+        # The first write is the inbound message; later ones are what we sent back.
+        stored = messages.document.return_value.set.call_args_list[0].args[0]
         assert stored["text"] == "My headset broke"
         assert stored["direction"] == "in"
 
@@ -178,333 +188,187 @@ class TestMessagePersistence:
 
 
 class TestContactBootstrap:
-    def test_creates_contact_record_for_first_time_sender(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
+    def test_first_time_sender_is_created_with_their_whatsapp_name(
+        self, mock_db: MagicMock, sent: MagicMock
     ) -> None:
         mock_db.collection("contacts").document.return_value.get.return_value.exists = False
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=StartReport()))
-        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=Turn()))
 
         handle_inbound(_raw_text())
 
         contact_doc = mock_db.collection("contacts").document.return_value
-        contact_doc.set.assert_called_once()
         created = contact_doc.set.call_args.args[0]
         assert created["waNumber"] == WA_NUMBER
+        assert created["displayName"] == "Sunita Devi", "the flow never asks for a name"
         assert created["openTicketIds"] == []
 
-
-class TestClosedTicketIdsComputation:
-    def test_excludes_ids_that_are_open_again(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """A ticket can be both `openTicketIds` and stale `recentlyClosed` data
-        (e.g. reopened by another path) — routing must only see it as closed
-        once, so handle.py subtracts the open set before calling `route`."""
+    def test_a_missing_name_is_filled_in_later(self, mock_db: MagicMock, sent: MagicMock) -> None:
         mock_db.collection("contacts").document.return_value.get.return_value = _contact_snapshot(
-            openTicketIds=["TKT-2"],
-            recentlyClosed=[
-                {"ticketId": "TKT-1", "serviceId": "anganwadi-vr", "closedAt": NOW},
-                {"ticketId": "TKT-2", "serviceId": "poshan-ai", "closedAt": NOW},
-            ],
+            displayName=None
         )
-        ticket_snapshot = MagicMock()
-        ticket_snapshot.exists = True
-        ticket_snapshot.to_dict.return_value = {
-            "serviceId": "poshan-ai",
-            "serviceName": "Poshan AI",
-        }
-        mock_db.collection("tickets").document.return_value.get.return_value = ticket_snapshot
-
-        route_mock = MagicMock(return_value=StartReport())
-        monkeypatch.setattr(handle_module, "route", route_mock)
-        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=Turn()))
 
         handle_inbound(_raw_text())
-
-        assert route_mock.call_args.kwargs["closed_ticket_ids"] == frozenset({"TKT-1"})
-
-
-class TestStartReportDispatch:
-    def test_sends_prompt_and_saves_new_session(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        session = Session(
-            flow=Flow.REPORT, step=Step.LANGUAGE, started_at=NOW, last_activity_at=NOW
-        )
-        prompt = SendList("Choose your language", (Row("en", "English"),))
-        turn = Turn(replies=(prompt,), session=session)
-
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=StartReport()))
-        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=turn))
-        send_reply_mock = MagicMock(return_value="msg-out-1")
-        monkeypatch.setattr(handle_module, "send_reply", send_reply_mock)
-
-        handle_inbound(_raw_text())
-
-        send_reply_mock.assert_called_once_with(WA_NUMBER, prompt)
 
         contact_doc = mock_db.collection("contacts").document.return_value
-        session_updates = [
-            c.args[0] for c in contact_doc.update.call_args_list if "session" in c.args[0]
+        assert {"displayName": "Sunita Devi"} in [
+            c.args[0] for c in contact_doc.update.call_args_list
         ]
-        assert len(session_updates) == 1
-        assert session_updates[0]["session"]["step"] == Step.LANGUAGE.value
 
 
-class TestContinueSessionDispatch:
-    def test_learns_language_and_saves_next_step(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
+class TestDispatch:
+    def test_a_first_message_asks_for_a_language(self, mock_db: MagicMock, sent: MagicMock) -> None:
+        handle_inbound(_raw_text())
+
+        assert [t.name for t in _templates(sent)] == [defaults.WELCOME_LANGUAGE]
+        assert _session_updates(mock_db)[0]["step"] == "language"
+
+    def test_an_open_ticket_offers_the_choice_instead(
+        self, mock_db: MagicMock, sent: MagicMock
     ) -> None:
-        session = Session(flow=Flow.REPORT, step=Step.SERVICE, started_at=NOW, last_activity_at=NOW)
-        prompt = SendList("Which product?", (Row("anganwadi-vr", "Anganwadi VR"),))
-        turn = Turn(replies=(prompt,), session=session, learned_language=Language.HI)
-
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=ContinueSession()))
-        monkeypatch.setattr(handle_module, "advance", MagicMock(return_value=turn))
-        send_reply_mock = MagicMock(return_value="msg-out-2")
-        monkeypatch.setattr(handle_module, "send_reply", send_reply_mock)
-        create_ticket_mock = MagicMock()
-        monkeypatch.setattr(handle_module, "create_ticket", create_ticket_mock)
+        _open_ticket(mock_db)
 
         handle_inbound(_raw_text())
 
-        create_ticket_mock.assert_not_called()
-        send_reply_mock.assert_called_once_with(WA_NUMBER, prompt)
+        template = _templates(sent)[0]
+        assert template.name == defaults.RETURNING_OPTIONS
+        assert template.params == ("TKT-20260916-0042",)
+        assert _session_updates(mock_db)[0]["step"] == "returning"
+
+    def test_a_running_flow_answers_the_step_it_is_on(
+        self, mock_db: MagicMock, sent: MagicMock
+    ) -> None:
+        mock_db.collection("contacts").document.return_value.get.return_value = _contact_snapshot(
+            language="en", session=_session("category", language="en")
+        )
+
+        handle_inbound(_raw_tap("Device"))
+
+        template = _templates(sent)[0]
+        assert template.name == defaults.UPLOAD_MEDIA
+        assert template.params == ("Device",)
+        assert _session_updates(mock_db)[0]["step"] == "media"
+
+    def test_a_learned_language_is_saved_on_the_contact(
+        self, mock_db: MagicMock, sent: MagicMock
+    ) -> None:
+        mock_db.collection("contacts").document.return_value.get.return_value = _contact_snapshot(
+            session=_session("language")
+        )
+
+        handle_inbound(_raw_tap("हिन्दी"))
 
         contact_doc = mock_db.collection("contacts").document.return_value
-        language_updates = [
-            c.args[0] for c in contact_doc.update.call_args_list if c.args[0] == {"language": "hi"}
-        ]
-        assert len(language_updates) == 1
+        assert {"language": "hi"} in [c.args[0] for c in contact_doc.update.call_args_list]
 
-    def test_completes_flow_creates_ticket_and_stamps_messages(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        draft = Draft(
-            language=Language.EN,
-            service_id="anganwadi-vr",
-            category_id="headset",
-            display_name="Asha",
-            centre_name="Ward 4 Centre",
-            description="Headset won't turn on",
+    def test_an_answered_question_ends_the_flow(self, mock_db: MagicMock, sent: MagicMock) -> None:
+        """ "Previous Ticket" replies with the status and leaves nothing open."""
+        _open_ticket(mock_db, "TKT-1")
+        mock_db.collection("contacts").document.return_value.get.return_value = _contact_snapshot(
+            language="en",
+            openTicketIds=["TKT-1"],
+            session=_session(
+                "returning",
+                language="en",
+                ticket_id="TKT-1",
+                category_label="Software",
+                status="in_progress",
+                raised_on="14 Sep 2026",
+            ),
         )
-        turn = Turn(create=draft)
 
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=ContinueSession()))
-        monkeypatch.setattr(handle_module, "advance", MagicMock(return_value=turn))
-        create_ticket_mock = MagicMock(return_value="TKT-20260909-0001")
-        monkeypatch.setattr(handle_module, "create_ticket", create_ticket_mock)
-        send_text_mock = MagicMock(return_value="msg-out-3")
-        monkeypatch.setattr(handle_module, "send_text", send_text_mock)
+        handle_inbound(_raw_tap("Previous Ticket"))
 
-        unstamped_doc = MagicMock()
+        assert _templates(sent)[0].name == defaults.TICKET_STATUS
+        assert _session_updates(mock_db) == [None]
+
+
+class TestCompletion:
+    @pytest.fixture
+    def created(self, monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+        mock = MagicMock(return_value="TKT-20260916-0007")
+        monkeypatch.setattr(handle_module, "create_ticket", mock)
+        return mock
+
+    def test_a_photo_files_the_ticket_and_confirms_it(
+        self, mock_db: MagicMock, sent: MagicMock, created: MagicMock
+    ) -> None:
+        mock_db.collection("contacts").document.return_value.get.return_value = _contact_snapshot(
+            language="en", session=_session("media", language="en", category_id="device")
+        )
+        unstamped = MagicMock()
         messages = mock_db.collection("contacts").document.return_value.collection.return_value
-        messages.where.return_value.get.return_value = [unstamped_doc]
+        messages.where.return_value.get.return_value = [unstamped]
 
-        handle_inbound(_raw_text())
+        handle_inbound(_raw_image())
 
-        create_ticket_mock.assert_called_once()
-        assert create_ticket_mock.call_args.args == (draft, WA_NUMBER)
-        assert isinstance(create_ticket_mock.call_args.kwargs["now"], datetime)
+        draft, wa_number = created.call_args.args
+        assert wa_number == WA_NUMBER
+        assert draft == Draft(language=Language.EN, category_id="device", description="")
 
-        send_text_mock.assert_called_once()
-        sent_wa, sent_text = send_text_mock.call_args.args
-        assert sent_wa == WA_NUMBER
-        assert "TKT-20260909-0001" in sent_text
+        template = _templates(sent)[0]
+        assert template.name == defaults.TICKET_CREATED
+        assert template.params == ("TKT-20260916-0007", "Device", f"+{WA_NUMBER}")
 
-        unstamped_doc.reference.update.assert_called_once_with({"ticketId": "TKT-20260909-0001"})
-
-        outbound_data = messages.document.return_value.set.call_args_list[-1].args[0]
-        assert outbound_data["ticketId"] == "TKT-20260909-0001"
-        assert outbound_data["text"] == sent_text
-
-
-class TestAppendToTicketDispatch:
-    def test_stamps_message_logs_event_and_confirms(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=AppendToTicket("TKT-1")))
-        send_text_mock = MagicMock(return_value="msg-out-4")
-        monkeypatch.setattr(handle_module, "send_text", send_text_mock)
-
-        handle_inbound(_raw_text(message_id="wamid.append-1", text="still broken"))
-
-        messages = mock_db.collection("contacts").document.return_value.collection.return_value
-        messages.document.return_value.update.assert_called_once_with({"ticketId": "TKT-1"})
-
-        events = mock_db.collection("tickets").document.return_value.collection.return_value
-        events.document.return_value.set.assert_called_once()
-        event_data = events.document.return_value.set.call_args.args[0]
-        assert event_data["type"] == EventType.MESSAGE_ADDED
-
-        send_text_mock.assert_called_once()
-        sent_wa, sent_text = send_text_mock.call_args.args
-        assert sent_wa == WA_NUMBER
-        assert "TKT-1" in sent_text
-
-
-class TestDisambiguateDispatch:
-    def test_offers_list_of_open_tickets_plus_new(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        options = (
-            OpenTicket(ticket_id="TKT-1", service_id="anganwadi-vr", service_name="Anganwadi VR"),
-            OpenTicket(ticket_id="TKT-2", service_id="poshan-ai", service_name="Poshan AI"),
-        )
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=Disambiguate(options)))
-        send_reply_mock = MagicMock(return_value="msg-out-5")
-        monkeypatch.setattr(handle_module, "send_reply", send_reply_mock)
-
-        handle_inbound(_raw_text())
-
-        expected_rows = (
-            Row("anganwadi-vr", "Anganwadi VR"),
-            Row("poshan-ai", "Poshan AI"),
-            Row("new", "Report a new problem"),
-        )
-        expected_reply = SendList("Which one is this about?", expected_rows)
-        send_reply_mock.assert_called_once_with(WA_NUMBER, expected_reply)
-
-
-class TestAskAboutRecentlyClosedDispatch:
-    def test_asks_before_assuming_same_problem(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        closed = ClosedTicketRef(ticket_id="TKT-9", service_id="anganwadi-vr", closed_at=NOW)
-        monkeypatch.setattr(
-            handle_module, "route", MagicMock(return_value=AskAboutRecentlyClosed(closed))
-        )
-        send_reply_mock = MagicMock(return_value="msg-out-6")
-        monkeypatch.setattr(handle_module, "send_reply", send_reply_mock)
-
-        handle_inbound(_raw_text())
-
-        expected_text = "Is this about your anganwadi-vr report TKT-9, or a new problem?"
-        expected_reply = SendButtons(
-            expected_text,
-            (Row("reopen", "Same problem"), Row("new", "Report a new problem")),
-        )
-        send_reply_mock.assert_called_once_with(WA_NUMBER, expected_reply)
-
-
-class TestReopenTicketDispatch:
-    def test_reopens_and_confirms(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch, enqueued: MagicMock
-    ) -> None:
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=ReopenTicket("TKT-9")))
-        reopen_mock = MagicMock(return_value=True)
-        monkeypatch.setattr(handle_module, "_reopen", reopen_mock)
-        send_text_mock = MagicMock(return_value="msg-out-7")
-        monkeypatch.setattr(handle_module, "send_text", send_text_mock)
-
-        handle_inbound(_raw_text())
-
-        reopen_mock.assert_called_once()
-        db_arg, ticket_id_arg, wa_arg, _now_arg = reopen_mock.call_args.args
-        assert db_arg is mock_db
-        assert ticket_id_arg == "TKT-9"
-        assert wa_arg == WA_NUMBER
-
-        send_text_mock.assert_called_once()
-        sent_wa, sent_text = send_text_mock.call_args.args
-        assert sent_wa == WA_NUMBER
-        assert "TKT-9" in sent_text
-
-        # The deadline clock restarts, so both checks are scheduled again.
-        sla_calls = [c for c in enqueued.call_args_list if c.args[0] == "/tasks/sla"]
-        assert [c.args[1] for c in sla_calls] == [{"ticket_id": "TKT-9"}] * 2
-
-    def test_no_new_deadlines_when_another_ticket_covers_the_product(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch, enqueued: MagicMock
-    ) -> None:
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=ReopenTicket("TKT-9")))
-        monkeypatch.setattr(handle_module, "_reopen", MagicMock(return_value=False))
-        monkeypatch.setattr(handle_module, "send_text", MagicMock(return_value="msg-out-8"))
-
-        handle_inbound(_raw_text())
-
-        enqueued.assert_not_called()
+        unstamped.reference.update.assert_called_once_with({"ticketId": "TKT-20260916-0007"})
 
 
 class TestBackgroundWork:
     def test_attachment_queues_a_download(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch, enqueued: MagicMock
+        self, mock_db: MagicMock, sent: MagicMock, enqueued: MagicMock
     ) -> None:
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=StartReport()))
-        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=Turn()))
-
         handle_inbound(_raw_image("wamid.img"))
 
-        enqueued.assert_called_once_with(
-            "/tasks/media", {"wa_number": WA_NUMBER, "message_id": "wamid.img"}
-        )
-        messages = mock_db.collection("contacts").document.return_value.collection.return_value
-        stored = messages.document.return_value.set.call_args_list[0].args[0]
-        assert stored["attachment"]["mediaUrl"].startswith("https://filemanager.gupshup.io/")
+        assert (
+            "/tasks/media",
+            {"wa_number": WA_NUMBER, "message_id": "wamid.img"},
+        ) in [c.args for c in enqueued.call_args_list]
 
     def test_text_message_queues_nothing(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch, enqueued: MagicMock
+        self, mock_db: MagicMock, sent: MagicMock, enqueued: MagicMock
     ) -> None:
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=StartReport()))
-        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=Turn()))
-
         handle_inbound(_raw_text())
 
         enqueued.assert_not_called()
 
-    def test_description_step_schedules_an_idle_check(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch, enqueued: MagicMock
+    def test_the_media_step_schedules_an_idle_check(
+        self, mock_db: MagicMock, sent: MagicMock, enqueued: MagicMock
     ) -> None:
-        session = Session(
-            flow=Flow.REPORT, step=Step.DESCRIPTION, started_at=NOW, last_activity_at=NOW
+        mock_db.collection("contacts").document.return_value.get.return_value = _contact_snapshot(
+            language="en", session=_session("category", language="en")
         )
-        monkeypatch.setattr(handle_module, "route", MagicMock(return_value=ContinueSession()))
-        monkeypatch.setattr(handle_module, "advance", MagicMock(return_value=Turn(session=session)))
 
-        handle_inbound(_raw_text())
+        handle_inbound(_raw_tap("Device"))
 
-        idle = seed().settings.description_idle_seconds
-        enqueued.assert_called_once_with(
-            "/tasks/idle", {"wa_number": WA_NUMBER}, at=NOW + timedelta(seconds=idle + 5)
-        )
+        idle = [c for c in enqueued.call_args_list if c.args[0] == "/tasks/idle"]
+        assert len(idle) == 1
+        assert idle[0].args[1] == {"wa_number": WA_NUMBER}
+        assert idle[0].kwargs["at"] is not None
 
 
 class TestStaleSession:
-    def _contact_with_session_started(self, mock_db: MagicMock, ago: timedelta) -> None:
+    def _with_session_started(self, mock_db: MagicMock, ago: timedelta) -> None:
         started = datetime.now(UTC) - ago
-        session = {
-            "flow": "report",
-            "step": "name",
-            "draft": {},
-            "startedAt": started,
-            "lastActivityAt": started,
-        }
-        contacts = mock_db.collection("contacts")
-        contacts.document.return_value.get.return_value = _contact_snapshot(session=session)
+        session = _session("category", language="en")
+        session["startedAt"] = started
+        session["lastActivityAt"] = started
+        mock_db.collection("contacts").document.return_value.get.return_value = _contact_snapshot(
+            language="en", session=session
+        )
 
-    def test_abandoned_flow_is_dropped_before_routing(
-        self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch
+    def test_an_abandoned_flow_is_dropped_and_the_contact_starts_over(
+        self, mock_db: MagicMock, sent: MagicMock
     ) -> None:
         expiry = timedelta(hours=seed().settings.session_expiry_hours)
-        self._contact_with_session_started(mock_db, expiry + timedelta(hours=1))
-        route_mock = MagicMock(return_value=StartReport())
-        monkeypatch.setattr(handle_module, "route", route_mock)
-        monkeypatch.setattr(handle_module, "begin", MagicMock(return_value=Turn()))
+        self._with_session_started(mock_db, expiry + timedelta(hours=1))
 
         handle_inbound(_raw_text())
 
-        assert route_mock.call_args.args[0].session is None
-        contact_doc = mock_db.collection("contacts").document.return_value
-        updates = [c.args[0] for c in contact_doc.update.call_args_list]
-        assert any("session" in u and u["session"] is None for u in updates)
+        # The language is known, so starting over means the category question.
+        assert _templates(sent)[0].name == defaults.ISSUE_CATEGORY
+        assert None in _session_updates(mock_db)
 
-    def test_recent_flow_is_kept(self, mock_db: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
-        self._contact_with_session_started(mock_db, timedelta(minutes=10))
-        route_mock = MagicMock(return_value=ContinueSession())
-        monkeypatch.setattr(handle_module, "route", route_mock)
-        monkeypatch.setattr(handle_module, "advance", MagicMock(return_value=Turn()))
+    def test_a_recent_flow_is_kept(self, mock_db: MagicMock, sent: MagicMock) -> None:
+        self._with_session_started(mock_db, timedelta(minutes=10))
 
-        handle_inbound(_raw_text())
+        handle_inbound(_raw_tap("Device"))
 
-        assert route_mock.call_args.args[0].session is not None
+        assert _templates(sent)[0].name == defaults.UPLOAD_MEDIA

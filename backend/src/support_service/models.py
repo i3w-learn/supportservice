@@ -15,8 +15,8 @@ from pydantic import BaseModel, Field
 class Language(StrEnum):
     EN = "en"
     HI = "hi"
-    TE = "te"
-    TA = "ta"
+    MR = "mr"
+    BN = "bn"
 
 
 class TicketStatus(StrEnum):
@@ -61,18 +61,15 @@ class ProviderStatus(StrEnum):
 
 class Flow(StrEnum):
     REPORT = "report"
-    DISAMBIGUATE = "disambiguate"
 
 
 class Step(StrEnum):
     """Keys into the step table (§7)."""
 
     LANGUAGE = "language"
-    SERVICE = "service"
-    NAME = "name"
-    CENTRE = "centre"
+    RETURNING = "returning"
     CATEGORY = "category"
-    DESCRIPTION = "description"
+    MEDIA = "media"
 
 
 class EventType(StrEnum):
@@ -102,6 +99,8 @@ class InboundMessage(BaseModel):
     wa_number: str
     type: MessageType
     text: str | None = None
+    """The WhatsApp profile name, so a ticket can name the reporter without asking."""
+    sender_name: str | None = None
     """For interactive replies: the id of the row or button the contact tapped."""
     reply_id: str | None = None
     """Set when the contact used WhatsApp's reply-swipe on one of our messages."""
@@ -124,31 +123,23 @@ class Session(BaseModel):
     last_activity_at: datetime
 
 
-class ClosedTicketRef(BaseModel):
-    """An entry in `recentlyClosed`. Without these, `closed -> open` is unreachable."""
-
-    ticket_id: str
-    service_id: str
-    closed_at: datetime
-
-
 class Contact(BaseModel):
     """Root record, one per phone number (§5)."""
 
     wa_number: str
     display_name: str | None = None
-    centre_name: str | None = None
     language: Language | None = None
     session: Session | None = None
     open_ticket_ids: list[str] = Field(default_factory=list)
-    recently_closed: list[ClosedTicketRef] = Field(default_factory=list)
     last_inbound_at: datetime | None = None
     last_outbound_at: datetime | None = None
 
 
 class OpenTicket(BaseModel):
-    """The slice of a ticket that routing needs. Not the whole document."""
+    """The slice of a ticket the flow needs. Not the whole document."""
 
     ticket_id: str
-    service_id: str
-    service_name: str
+    category_id: str
+    category_label: str
+    status: TicketStatus
+    created_at: datetime

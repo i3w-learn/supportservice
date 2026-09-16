@@ -3,6 +3,9 @@
 Pure: one turn in, replies and a new session out. Nothing here writes to
 Firestore or calls Gupshup — the caller does that. The machine never holds
 state in memory between messages, because Cloud Run kills idle containers.
+
+Every prompt is an approved WhatsApp template. The only free text is the nudge
+after an unrecognised tap, and the regional-language list.
 """
 
 from __future__ import annotations
@@ -10,8 +13,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from support_service.config.models import MAX_LIST_ROWS, ConfigSnapshot
-from support_service.models import Contact, Flow, InboundMessage, Language, Session, Step
+from support_service.config import defaults
+from support_service.config.models import ConfigSnapshot
+from support_service.models import (
+    Contact,
+    Flow,
+    InboundMessage,
+    Language,
+    OpenTicket,
+    Session,
+    Step,
+)
 
 
 @dataclass(frozen=True)
@@ -32,12 +44,15 @@ class SendList:
 
 
 @dataclass(frozen=True)
-class SendButtons:
-    body: str
-    buttons: tuple[Row, ...]
+class SendTemplate:
+    """An approved template. `params` fill {{1}}, {{2}}… in order."""
+
+    name: str
+    language: Language
+    params: tuple[str, ...] = ()
 
 
-Reply = SendText | SendList | SendButtons
+Reply = SendText | SendList | SendTemplate
 
 
 @dataclass(frozen=True)
@@ -45,11 +60,8 @@ class Draft:
     """Everything gathered, ready for the ticket-creation transaction."""
 
     language: Language
-    service_id: str
     category_id: str
-    display_name: str
-    centre_name: str
-    description: str
+    description: str = ""
 
 
 @dataclass(frozen=True)
@@ -63,19 +75,29 @@ class Turn:
     learned_language: Language | None = None
 
 
-LANGUAGE_LABELS = {
-    Language.EN: "English",
-    Language.HI: "हिन्दी",
-    Language.TE: "తెలుగు",
-    Language.TA: "தமிழ்",
-}
-
-
 def begin(contact: Contact, config: ConfigSnapshot, *, now: datetime) -> Turn:
     """Open the report flow. Skips language once the contact has one."""
     if contact.language is None:
-        return _ask_language(config, now=now)
-    return _ask_service(contact.language, config, now=now, draft={})
+        return Turn(
+            replies=(SendTemplate(defaults.WELCOME_LANGUAGE, Language.EN),),
+            session=_session(Step.LANGUAGE, {}, now),
+        )
+    return _ask_category(contact.language, now=now, draft={"language": contact.language.value})
+
+
+def offer_returning(ticket: OpenTicket, language: Language, *, now: datetime) -> Turn:
+    """A contact with an open ticket chooses: a new one, or that one's status."""
+    draft = {
+        "language": language.value,
+        "ticket_id": ticket.ticket_id,
+        "category_label": ticket.category_label,
+        "status": ticket.status.value,
+        "raised_on": ticket.created_at.strftime("%d %b %Y"),
+    }
+    return Turn(
+        replies=(SendTemplate(defaults.RETURNING_OPTIONS, language, (ticket.ticket_id,)),),
+        session=_session(Step.RETURNING, draft, now),
+    )
 
 
 def advance(
@@ -95,11 +117,9 @@ def advance(
 
     handlers = {
         Step.LANGUAGE: _on_language,
-        Step.SERVICE: _on_service,
-        Step.NAME: _on_name,
-        Step.CENTRE: _on_centre,
+        Step.RETURNING: _on_returning,
         Step.CATEGORY: _on_category,
-        Step.DESCRIPTION: _on_description,
+        Step.MEDIA: _on_media,
     }
     return handlers[session.step](contact, message, config, draft, language, now)
 
@@ -115,17 +135,27 @@ def _on_language(
     language: Language,
     now: datetime,
 ) -> Turn:
-    chosen = _pick(message, [lang.value for lang in config.languages])
+    regional = [
+        (lang.value, defaults.LANGUAGE_LABELS[lang]) for lang in defaults.REGIONAL_LANGUAGES
+    ]
+    chosen = _pick(message, [*defaults.LANGUAGE_BUTTONS, *regional])
+
+    if chosen == defaults.REGIONAL:
+        rows = tuple(Row(value, label) for value, label in regional)
+        return Turn(
+            replies=(SendList(config.text("ask_regional", language), rows),),
+            session=_session(Step.LANGUAGE, draft, now),
+        )
     if chosen is None:
-        return _retry(_ask_language(config, now=now), config, language)
+        return _retry(_welcome(now), config, language)
 
     picked = Language(chosen)
     draft["language"] = picked.value
-    prompt = _ask_service(picked, config, now=now, draft=draft)
+    prompt = _ask_category(picked, now=now, draft=draft)
     return Turn(replies=prompt.replies, session=prompt.session, learned_language=picked)
 
 
-def _on_service(
+def _on_returning(
     contact: Contact,
     message: InboundMessage,
     config: ConfigSnapshot,
@@ -133,55 +163,29 @@ def _on_service(
     language: Language,
     now: datetime,
 ) -> Turn:
-    chosen = _pick(message, [service.id for service in config.enabled_services()])
-    if chosen is None:
-        return _retry(_ask_service(language, config, now=now, draft=draft), config, language)
+    chosen = _pick(
+        message,
+        [
+            (defaults.NEW_TICKET, config.text("new_ticket_button", language)),
+            (defaults.PREVIOUS_TICKET, config.text("previous_ticket_button", language)),
+        ],
+    )
 
-    draft["service_id"] = chosen
+    if chosen == defaults.NEW_TICKET:
+        return _ask_category(language, now=now, draft={"language": language.value})
 
-    # Returning contacts skip name and centre — a second ticket is 3 taps, not 6.
-    if contact.display_name and contact.centre_name:
-        draft["display_name"] = contact.display_name
-        draft["centre_name"] = contact.centre_name
-        return _ask_category(language, config, now=now, draft=draft)
-
-    return _ask(Step.NAME, "ask_name", language, config, now=now, draft=draft)
-
-
-def _on_name(
-    contact: Contact,
-    message: InboundMessage,
-    config: ConfigSnapshot,
-    draft: dict[str, str],
-    language: Language,
-    now: datetime,
-) -> Turn:
-    value = _clean_text(message, 1, 80)
-    if value is None:
-        return _retry(
-            _ask(Step.NAME, "ask_name", language, config, now=now, draft=draft), config, language
+    if chosen == defaults.PREVIOUS_TICKET:
+        status = config.text(f"status_{draft.get('status', '')}", language)
+        params = (
+            draft.get("ticket_id", ""),
+            draft.get("category_label", ""),
+            status,
+            draft.get("raised_on", ""),
         )
-    draft["display_name"] = value
-    return _ask(Step.CENTRE, "ask_centre", language, config, now=now, draft=draft)
+        # The status answers the question, so the flow ends here.
+        return Turn(replies=(SendTemplate(defaults.TICKET_STATUS, language, params),))
 
-
-def _on_centre(
-    contact: Contact,
-    message: InboundMessage,
-    config: ConfigSnapshot,
-    draft: dict[str, str],
-    language: Language,
-    now: datetime,
-) -> Turn:
-    value = _clean_text(message, 1, 120)
-    if value is None:
-        return _retry(
-            _ask(Step.CENTRE, "ask_centre", language, config, now=now, draft=draft),
-            config,
-            language,
-        )
-    draft["centre_name"] = value
-    return _ask_category(language, config, now=now, draft=draft)
+    return _retry(_offer_again(draft, language, now), config, language)
 
 
 def _on_category(
@@ -192,17 +196,23 @@ def _on_category(
     language: Language,
     now: datetime,
 ) -> Turn:
-    service = config.service(draft.get("service_id", ""))
-    valid = [category.id for category in service.enabled_categories()] if service else []
-    chosen = _pick(message, valid)
+    options = [
+        (category.id, config.category_label(category.id, language))
+        for category in config.enabled_categories()
+    ]
+    chosen = _pick(message, options)
     if chosen is None:
-        return _retry(_ask_category(language, config, now=now, draft=draft), config, language)
+        return _retry(_ask_category(language, now=now, draft=draft), config, language)
 
     draft["category_id"] = chosen
-    return _ask_description(language, config, now=now, draft=draft)
+    label = config.category_label(chosen, language)
+    return Turn(
+        replies=(SendTemplate(defaults.UPLOAD_MEDIA, language, (label,)),),
+        session=_session(Step.MEDIA, draft, now),
+    )
 
 
-def _on_description(
+def _on_media(
     contact: Contact,
     message: InboundMessage,
     config: ConfigSnapshot,
@@ -210,39 +220,39 @@ def _on_description(
     language: Language,
     now: datetime,
 ) -> Turn:
-    """Collect text and media until Done. Media with no text is valid (§7)."""
-    # Check for the finish signal first, or typing "Done" lands in the description.
-    if message.reply_id == "done" or (message.text or "").strip().lower() == "done":
-        return Turn(create=_to_draft(draft), session=None)
+    """A photo or Skip files the ticket. Typed text becomes its description."""
+    chosen = _pick(
+        message,
+        [
+            (defaults.UPLOAD_NOW, config.text("upload_button", language)),
+            (defaults.SKIP, config.text("skip_button", language)),
+        ],
+    )
 
-    if message.text:
+    if chosen == defaults.SKIP:
+        return Turn(create=_to_draft(draft))
+
+    if message.attachment is not None:
+        draft["has_media"] = "yes"
+        return Turn(create=_to_draft(draft))
+
+    # "Upload Now" is a nudge, not an answer — wait for the file itself.
+    if chosen is None and message.text:
         existing = draft.get("description", "")
         draft["description"] = f"{existing}\n{message.text}".strip() if existing else message.text
-    if message.attachment is not None:
-        # Lets the idle rescue file a photos-only report (see finish_idle).
-        draft["has_media"] = "yes"
 
-    # Anything else — more text, a photo — keeps the step open.
-    return Turn(
-        session=Session(
-            flow=Flow.REPORT,
-            step=Step.DESCRIPTION,
-            draft=draft,
-            started_at=now,
-            last_activity_at=now,
-        )
-    )
+    return Turn(session=_session(Step.MEDIA, draft, now))
 
 
 def finish_idle(session: Session) -> Draft | None:
-    """Close a `description` step abandoned past the idle window.
+    """File a report left waiting at the media step past the idle window.
 
     Called by a delayed Cloud Task, not by a message. Cloud Run freezes the
     CPU between requests, so a timer inside the process would never fire.
     """
-    if session.step is not Step.DESCRIPTION:
+    if session.step is not Step.MEDIA:
         return None
-    if not (session.draft.get("description") or session.draft.get("has_media")):
+    if not session.draft.get("category_id"):
         return None
     return _to_draft(session.draft)
 
@@ -250,66 +260,26 @@ def finish_idle(session: Session) -> Draft | None:
 # --- prompts -------------------------------------------------------------
 
 
-def _ask_language(config: ConfigSnapshot, *, now: datetime) -> Turn:
-    rows = tuple(Row(lang.value, LANGUAGE_LABELS[lang]) for lang in config.languages)
-    body = config.text("ask_language", Language.EN)
+def _welcome(now: datetime) -> Turn:
     return Turn(
-        replies=(SendList(body, rows),),
-        session=Session(flow=Flow.REPORT, step=Step.LANGUAGE, started_at=now, last_activity_at=now),
+        replies=(SendTemplate(defaults.WELCOME_LANGUAGE, Language.EN),),
+        session=_session(Step.LANGUAGE, {}, now),
     )
 
 
-def _ask_service(
-    language: Language, config: ConfigSnapshot, *, now: datetime, draft: dict[str, str]
-) -> Turn:
-    services = config.enabled_services()[:MAX_LIST_ROWS]
-    rows = tuple(Row(s.id, s.name.get(language, s.name.get(Language.EN, s.id))) for s in services)
-    return Turn(
-        replies=(SendList(config.text("ask_service", language), rows),),
-        session=_session(Step.SERVICE, draft, now),
-    )
-
-
-def _ask_category(
-    language: Language, config: ConfigSnapshot, *, now: datetime, draft: dict[str, str]
-) -> Turn:
-    service = config.service(draft.get("service_id", ""))
-    categories = service.enabled_categories()[:MAX_LIST_ROWS] if service else []
-    rows = tuple(
-        Row(c.id, c.label.get(language, c.label.get(Language.EN, c.id))) for c in categories
-    )
-    return Turn(
-        replies=(SendList(config.text("ask_category", language), rows),),
-        session=_session(Step.CATEGORY, draft, now),
-    )
-
-
-def _ask_description(
-    language: Language, config: ConfigSnapshot, *, now: datetime, draft: dict[str, str]
-) -> Turn:
+def _offer_again(draft: dict[str, str], language: Language, now: datetime) -> Turn:
     return Turn(
         replies=(
-            SendButtons(
-                config.text("ask_description", language),
-                (Row("done", config.text("done_button", language)),),
-            ),
+            SendTemplate(defaults.RETURNING_OPTIONS, language, (draft.get("ticket_id", ""),)),
         ),
-        session=_session(Step.DESCRIPTION, draft, now),
+        session=_session(Step.RETURNING, draft, now),
     )
 
 
-def _ask(
-    step: Step,
-    key: str,
-    language: Language,
-    config: ConfigSnapshot,
-    *,
-    now: datetime,
-    draft: dict[str, str],
-) -> Turn:
+def _ask_category(language: Language, *, now: datetime, draft: dict[str, str]) -> Turn:
     return Turn(
-        replies=(SendText(config.text(key, language)),),
-        session=_session(step, draft, now),
+        replies=(SendTemplate(defaults.ISSUE_CATEGORY, language),),
+        session=_session(Step.CATEGORY, draft, now),
     )
 
 
@@ -320,22 +290,29 @@ def _session(step: Step, draft: dict[str, str], now: datetime) -> Session:
     return Session(flow=Flow.REPORT, step=step, draft=draft, started_at=now, last_activity_at=now)
 
 
-def _pick(message: InboundMessage, valid: list[str]) -> str | None:
-    """Accept a tapped row id, or a 1-based digit for phones that fail lists."""
-    if message.reply_id and message.reply_id in valid:
-        return message.reply_id
+def _pick(message: InboundMessage, options: list[tuple[str, str]]) -> str | None:
+    """Work out which button was tapped.
 
-    raw = (message.text or "").strip()
-    if raw.isdigit():
-        index = int(raw) - 1
-        if 0 <= index < len(valid):
-            return valid[index]
+    A template's quick reply comes back as the button's own text, with the
+    button index as its id — neither is an id we chose. Rows in lists we send
+    ourselves do carry our id, so all three are accepted.
+    """
+    typed = (message.text or "").strip().casefold()
+    for option_id, label in options:
+        if message.reply_id == option_id:
+            return option_id
+        if typed and typed == label.strip().casefold():
+            return option_id
+
+    if message.reply_id and message.reply_id.isdigit():
+        index = int(message.reply_id)
+        if 0 <= index < len(options):
+            return options[index][0]
+    if typed.isdigit():
+        index = int(typed) - 1
+        if 0 <= index < len(options):
+            return options[index][0]
     return None
-
-
-def _clean_text(message: InboundMessage, low: int, high: int) -> str | None:
-    value = (message.text or "").strip()
-    return value if low <= len(value) <= high else None
 
 
 def _retry(prompt: Turn, config: ConfigSnapshot, language: Language) -> Turn:
@@ -356,10 +333,7 @@ def _draft_language(draft: dict[str, str], contact: Contact) -> Language:
 def _to_draft(draft: dict[str, str]) -> Draft:
     return Draft(
         language=Language(draft.get("language", Language.EN.value)),
-        service_id=draft["service_id"],
         category_id=draft["category_id"],
-        display_name=draft["display_name"],
-        centre_name=draft["centre_name"],
         description=draft.get("description", ""),
     )
 
@@ -368,11 +342,12 @@ __all__ = [
     "Draft",
     "Reply",
     "Row",
-    "SendButtons",
     "SendList",
+    "SendTemplate",
     "SendText",
     "Turn",
     "advance",
     "begin",
     "finish_idle",
+    "offer_returning",
 ]

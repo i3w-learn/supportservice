@@ -245,14 +245,13 @@ class TestResendResolution:
         mock_db = MagicMock()
         monkeypatch.setattr(resolution_module, "get_db", lambda: mock_db)
 
-        sent: dict[str, str] = {}
+        sent: dict[str, object] = {}
 
-        def _send_text(to: str, text: str) -> str:
-            sent["to"] = to
-            sent["text"] = text
+        def _send_template(to: str, name: str, language: str, params: list[str]) -> str:
+            sent.update({"to": to, "name": name, "language": language, "params": params})
             return "gs-msg-2"
 
-        monkeypatch.setattr(resolution_module, "send_text", _send_text)
+        monkeypatch.setattr(resolution_module, "send_template", _send_template)
         logged = MagicMock()
         monkeypatch.setattr(resolution_module, "log_outbound", logged)
 
@@ -260,12 +259,17 @@ class TestResendResolution:
 
         assert response.status_code == 200
         assert response.json() == {"status": "ok", "messageId": "gs-msg-2"}
-        assert sent == {"to": wa_number, "text": "Fixed it"}
+        assert sent == {
+            "to": wa_number,
+            "name": "ticket_resolved",
+            "language": "en",
+            "params": [TICKET_ID, "Fixed it"],
+        }
 
         # The delivery receipt that later closes the ticket finds it via this record.
         logged.assert_called_once()
         assert logged.call_args.args[1:4] == (wa_number, "gs-msg-2", "Fixed it")
-        assert logged.call_args.kwargs == {"ticket_id": TICKET_ID, "sent_via": "freeform"}
+        assert logged.call_args.kwargs == {"ticket_id": TICKET_ID, "sent_via": "template"}
 
         # No status-transition attempt: the fix's whole point is that this
         # path never calls validate_transition(RESOLVED, RESOLVED). Instead

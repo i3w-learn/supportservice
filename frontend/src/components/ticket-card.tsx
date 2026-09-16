@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter"
-import { AlertTriangle, Clock3, Paperclip, TriangleAlert } from "lucide-react"
+import { AlertTriangle, Clock3, Paperclip, TriangleAlert, User } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { SERVICES } from "@/lib/types"
+import { CATEGORIES } from "@/lib/types"
 import type { Ticket } from "@/lib/types"
 import { replyWindow } from "@/lib/window"
 
@@ -27,7 +27,7 @@ export function TicketCard({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
-  const service = SERVICES[ticket.serviceId]
+  const category = CATEGORIES[ticket.categoryId]
   const win = replyWindow(ticket.lastInboundAt)
 
   useEffect(() => {
@@ -65,9 +65,9 @@ export function TicketCard({
       <div className="mt-3 flex items-center gap-2">
         <span
           className="size-3.5 shrink-0 rounded-[3px]"
-          style={{ background: service.color }}
-          title={service.name}
-          aria-label={service.name}
+          style={{ background: category.color }}
+          title={category.name}
+          aria-label={category.name}
         />
         <span className="font-mono text-[11px] tracking-tight text-muted-foreground">
           {ticket.ticketId.replace("TKT-", "")}
@@ -121,13 +121,15 @@ export function TicketCard({
             <TooltipTrigger asChild>
               <Avatar className="size-5">
                 <AvatarFallback className="text-[9px] font-medium">
-                  {initials(ticket.contactName)}
+                  {ticket.contactName ? (
+                    initials(ticket.contactName)
+                  ) : (
+                    <User className="size-2.5" />
+                  )}
                 </AvatarFallback>
               </Avatar>
             </TooltipTrigger>
-            <TooltipContent>
-              {ticket.contactName} · {ticket.centreName}
-            </TooltipContent>
+            <TooltipContent>{ticket.contactName ?? `+${ticket.waNumber}`}</TooltipContent>
           </Tooltip>
         </div>
       </div>
