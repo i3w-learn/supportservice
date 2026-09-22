@@ -12,6 +12,7 @@ and the matching comment in `ticket_service.py`.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -55,6 +56,8 @@ from support_service.models import (
 )
 from support_service.repositories.base import from_firestore, get_db, to_firestore
 from support_service.services import task_service
+
+log = logging.getLogger(__name__)
 
 # --- normalize: Gupshup payload -> InboundMessage --------------------------
 #
@@ -136,8 +139,15 @@ def normalize(raw: dict[str, Any]) -> InboundMessage:
 # --- send: outbound messages to Gupshup ------------------------------------
 #
 # Every send returns the Gupshup messageId.
+#
+# Free-form messages (text, lists) go to API_URL as a JSON `message`.
+# Templates have their own endpoint and are addressed by Gupshup's template
+# id — not by name, and each language variant has its own id. The ids come
+# from TEMPLATE_LIST_URL and are cached per process (see `_template_id`).
 
 API_URL = "https://api.gupshup.io/wa/api/v1/msg"
+TEMPLATE_URL = "https://api.gupshup.io/wa/api/v1/template/msg"
+TEMPLATE_LIST_URL = "https://api.gupshup.io/sm/api/v1/template/list/{app_name}"
 
 
 @dataclass
@@ -155,22 +165,87 @@ def _config() -> GupshupConfig:
     )
 
 
-def _send(destination: str, message: dict[str, Any]) -> str:
+def _post(url: str, destination: str, body: dict[str, str]) -> str:
     cfg = _config()
     response = httpx.post(
-        API_URL,
+        url,
         headers={"apikey": cfg.api_key},
         data={
             "channel": "whatsapp",
             "source": cfg.source_number,
             "destination": destination,
             "src.name": cfg.app_name,
-            "message": json.dumps(message),
+            **body,
         },
         timeout=10.0,
     )
     response.raise_for_status()
     return response.json().get("messageId", "")
+
+
+def _send(destination: str, message: dict[str, Any]) -> str:
+    return _post(API_URL, destination, {"message": json.dumps(message)})
+
+
+# (element name, two-letter language code) -> Gupshup template id, approved only.
+_template_ids: dict[tuple[str, str], str] = {}
+_template_ids_loaded_at: datetime | None = None
+#: How long a loaded list is trusted before it is fetched again. Bounds how
+#: long a newly approved language variant takes to start being used.
+TEMPLATE_CACHE_TTL = timedelta(minutes=10)
+
+
+def _load_template_ids() -> None:
+    """Fetch every template on the app and keep the approved ones.
+
+    Gupshup reports language as `en`, `en_US`, `hi`…; the flow only knows
+    two-letter codes, so `en_US` is filed under `en`.
+    """
+    global _template_ids_loaded_at
+    cfg = _config()
+    response = httpx.get(
+        TEMPLATE_LIST_URL.format(app_name=cfg.app_name),
+        headers={"apikey": cfg.api_key},
+        timeout=30.0,
+    )
+    response.raise_for_status()
+
+    approved: dict[tuple[str, str], str] = {}
+    for template in response.json().get("templates", []):
+        if template.get("status") != "APPROVED":
+            continue
+        name = template.get("elementName")
+        code = (template.get("languageCode") or "").split("_")[0].lower()
+        template_id = template.get("id")
+        if name and code and template_id:
+            approved.setdefault((name, code), template_id)
+
+    _template_ids.clear()
+    _template_ids.update(approved)
+    _template_ids_loaded_at = datetime.now(UTC)
+
+
+def _template_id(name: str, language: str) -> str:
+    """The Gupshup id to send `name` in `language`, or in English when that
+    language is not approved yet (design doc §4.3). Raises LookupError when
+    neither exists — a setup problem, not something to retry."""
+    stale = (
+        _template_ids_loaded_at is None
+        or datetime.now(UTC) - _template_ids_loaded_at > TEMPLATE_CACHE_TTL
+    )
+    if stale:
+        try:
+            _load_template_ids()
+        except httpx.HTTPError:
+            if not _template_ids:
+                raise
+            log.warning("Could not refresh Gupshup template list; using cached ids")
+
+    for code in dict.fromkeys((language, Language.EN.value)):
+        template_id = _template_ids.get((name, code))
+        if template_id is not None:
+            return template_id
+    raise LookupError(f"No approved Gupshup template {name!r} in {language!r} or 'en'")
 
 
 def send_text(to: str, text: str) -> str:
@@ -200,22 +275,8 @@ def send_list(to: str, body: str, button_title: str, rows: list[Row]) -> str:
 
 
 def send_template(to: str, template_name: str, language: str, params: list[str]) -> str:
-    return _send(
-        to,
-        {
-            "type": "template",
-            "template": {
-                "name": template_name,
-                "language": {"policy": "deterministic", "code": language},
-                "components": [
-                    {
-                        "type": "body",
-                        "parameters": [{"type": "text", "text": p} for p in params],
-                    }
-                ],
-            },
-        },
-    )
+    template = {"id": _template_id(template_name, language), "params": params}
+    return _post(TEMPLATE_URL, to, {"template": json.dumps(template)})
 
 
 def send_reply(to: str, reply: Reply) -> str:
