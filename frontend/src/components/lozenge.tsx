@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
-import { CATEGORIES, STATUS_LABEL } from "@/lib/types"
-import type { CategoryId, SlaState, TicketStatus } from "@/lib/types"
+import { categoryMeta, STATUS_LABEL } from "@/lib/types"
+import type { SlaState, TicketStatus } from "@/lib/types"
 
 // Jira calls these lozenges. Status is encoded in colour and shape so the
 // queue reads at a glance, not only by reading the words.
@@ -42,8 +42,8 @@ export function FailedLozenge() {
   )
 }
 
-export function CategoryTag({ category }: { category: CategoryId }) {
-  const { name, color } = CATEGORIES[category]
+export function CategoryTag({ category, label }: { category: string; label?: string }) {
+  const { name, color } = categoryMeta(category, label)
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
       <span className="size-1.5 rounded-full" style={{ background: color }} aria-hidden />

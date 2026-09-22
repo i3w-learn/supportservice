@@ -93,7 +93,7 @@ export function TicketDetail({
           {ticket.categoryLabel}
         </h1>
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
-          <CategoryTag category={ticket.categoryId} />
+          <CategoryTag category={ticket.categoryId} label={ticket.categoryLabel} />
           <span aria-hidden>·</span>
           {ticket.contactName && (
             <>

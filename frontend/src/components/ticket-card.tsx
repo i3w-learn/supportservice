@@ -5,7 +5,7 @@ import { AlertTriangle, Clock3, Paperclip, TriangleAlert, User } from "lucide-re
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { CATEGORIES } from "@/lib/types"
+import { categoryMeta } from "@/lib/types"
 import type { Ticket } from "@/lib/types"
 import { replyWindow } from "@/lib/window"
 
@@ -27,7 +27,7 @@ export function TicketCard({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
-  const category = CATEGORIES[ticket.categoryId]
+  const category = categoryMeta(ticket.categoryId, ticket.categoryLabel)
   const win = replyWindow(ticket.lastInboundAt)
 
   useEffect(() => {

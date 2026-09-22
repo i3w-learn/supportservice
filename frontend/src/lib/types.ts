@@ -91,6 +91,13 @@ export const CATEGORIES: Record<CategoryId, { name: string; color: string }> = {
   other: { name: "Other", color: "#3E8FA8" },
 }
 
+/** Tickets from before the template flow carry categories the dashboard no
+ *  longer knows (e.g. "controller"). Show those under the label the contact
+ *  saw, in a neutral colour, rather than crash the whole page on one row. */
+export function categoryMeta(id: string, label?: string): { name: string; color: string } {
+  return CATEGORIES[id as CategoryId] ?? { name: label || id, color: "var(--color-muted-foreground)" }
+}
+
 export const LANGUAGES: Record<Lang, string> = {
   en: "English",
   hi: "हिन्दी",
