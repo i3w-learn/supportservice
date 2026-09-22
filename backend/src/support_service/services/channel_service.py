@@ -101,7 +101,9 @@ def normalize(raw: dict[str, Any]) -> InboundMessage:
         text = inner.get("text")
 
     elif gupshup_type in ("list_reply", "quick_reply"):
-        text = inner.get("title")
+        # Our own lists and buttons come back with `title`; a tap on a
+        # template's quick-reply button comes back with `text` instead.
+        text = inner.get("title") or inner.get("text")
         reply_id = inner.get("postbackText") or inner.get("id")
 
     elif gupshup_type == "button_reply":

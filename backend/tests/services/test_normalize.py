@@ -152,3 +152,27 @@ def test_the_whatsapp_profile_name_is_captured() -> None:
     }
 
     assert normalize(payload).sender_name == "Sunita Devi"
+
+
+def test_template_quick_reply_carries_the_button_text() -> None:
+    """A tap on a template's quick-reply button arrives as `quick_reply` with
+    the label under `text`, not `title` — unlike our own interactive buttons."""
+    payload = {
+        "app": "TestApp",
+        "timestamp": 1725888000000,
+        "version": 2,
+        "type": "message",
+        "payload": {
+            "id": "wamid.ABC126",
+            "source": "919876543210",
+            "type": "quick_reply",
+            "payload": {"text": "Device", "type": "button"},
+            "sender": {"phone": "919876543210", "name": "Test"},
+            "context": {"id": "wamid.PREV", "gsId": "gs-1"},
+        },
+    }
+    msg = normalize(payload)
+    assert msg.type == MessageType.INTERACTIVE
+    assert msg.text == "Device"
+    assert msg.reply_id is None
+    assert msg.context_message_id == "wamid.PREV"
