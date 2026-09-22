@@ -419,21 +419,22 @@ Footer: `আপনার ধৈর্যের জন্য ধন্যবা�
 
 # Checklist
 
-All seven English versions were submitted on **16 Sept 2026** as Utility.
+All seven English versions were submitted on **16 Sept 2026** as Utility and approved.
+The Hindi, Marathi and Bengali versions were submitted on **22 Sept 2026** and were all
+approved the same day.
 
 | # | Template | Needed? | en | hi | mr | bn |
 |---|---|---|---|---|---|---|
-| 1 | support_language_selection | in-session | ☑ approved, Utility | ☐ | ☐ | ☐ |
-| 2 | new_user_issue_category | in-session | ☑ submitted | ☐ | ☐ | ☐ |
-| 3 | returning_user_options | in-session | ☑ approved, Utility | ☐ | ☐ | ☐ |
-| 4 | upload_media_request | in-session | ☑ submitted | ☐ | ☐ | ☐ |
-| 5 | ticket_status_update | **required** | ☑ submitted | ☐ | ☐ | ☐ |
-| 6 | ticket_created_confirmation | **required** | ☑ submitted | ☐ | ☐ | ☐ |
-| 7 | ticket_resolved | **required** | ☑ submitted | ☐ | ☐ | ☐ |
+| 1 | support_language_selection | in-session | ☑ approved | ☑ approved | ☑ approved | ☑ approved |
+| 2 | new_user_issue_category | in-session | ☑ approved | ☑ approved | ☑ approved | ☑ approved |
+| 3 | returning_user_options | in-session | ☑ approved | ☑ approved | ☑ approved | ☑ approved |
+| 4 | upload_media_request | in-session | ☑ approved | ☑ approved | ☑ approved | ☑ approved |
+| 5 | ticket_status_update | **required** | ☑ approved | ☑ approved | ☑ approved | ☑ approved |
+| 6 | ticket_created_confirmation | **required** | ☑ approved | ☑ approved | ☑ approved | ☑ approved |
+| 7 | ticket_resolved | **required** | ☑ approved | ☑ approved | ☑ approved | ☑ approved |
 
-"in-session" means the bot only ever sends it as a reply, so a free-form interactive
-message would do the same job without approval. See "Which of these actually need
-approval" above.
+All 28 are Utility. The server reads the approved list from Gupshup every ten minutes,
+so a newly approved language starts being used without a deploy.
 
 Approval takes 24–48 hours. Status shows Pending, then Approved or Rejected.
 
