@@ -149,13 +149,15 @@ def normalize(raw: dict[str, Any]) -> InboundMessage:
 
 API_URL = "https://api.gupshup.io/wa/api/v1/msg"
 TEMPLATE_URL = "https://api.gupshup.io/wa/api/v1/template/msg"
-TEMPLATE_LIST_URL = "https://api.gupshup.io/sm/api/v1/template/list/{app_name}"
+TEMPLATE_LIST_URL = "https://api.gupshup.io/wa/app/{app_id}/template?templateStatus=APPROVED"
 
 
 @dataclass
 class GupshupConfig:
     api_key: str
     app_name: str
+    #: The app's UUID. The template-list API is addressed by id, sends by name.
+    app_id: str
     source_number: str
 
 
@@ -163,6 +165,7 @@ def _config() -> GupshupConfig:
     return GupshupConfig(
         api_key=os.environ["GUPSHUP_API_KEY"],
         app_name=os.environ["GUPSHUP_APP_NAME"],
+        app_id=os.environ["GUPSHUP_APP_ID"],
         source_number=os.environ["GUPSHUP_SOURCE_NUMBER"],
     )
 
@@ -198,15 +201,16 @@ TEMPLATE_CACHE_TTL = timedelta(minutes=10)
 
 
 def _load_template_ids() -> None:
-    """Fetch every template on the app and keep the approved ones.
+    """Fetch the app's approved templates.
 
-    Gupshup reports language as `en`, `en_US`, `hi`…; the flow only knows
-    two-letter codes, so `en_US` is filed under `en`.
+    The URL already filters to APPROVED; the status check below is belt and
+    braces. Gupshup reports language as `en`, `en_US`, `hi`…; the flow only
+    knows two-letter codes, so `en_US` is filed under `en`.
     """
     global _template_ids_loaded_at
     cfg = _config()
     response = httpx.get(
-        TEMPLATE_LIST_URL.format(app_name=cfg.app_name),
+        TEMPLATE_LIST_URL.format(app_id=cfg.app_id),
         headers={"apikey": cfg.api_key},
         timeout=30.0,
     )

@@ -114,6 +114,7 @@ def test_load_template_ids_keeps_approved_only_and_normalises_language(
 
     monkeypatch.setenv("GUPSHUP_API_KEY", "k")
     monkeypatch.setenv("GUPSHUP_APP_NAME", "TestApp")
+    monkeypatch.setenv("GUPSHUP_APP_ID", "app-uuid")
     monkeypatch.setenv("GUPSHUP_SOURCE_NUMBER", "91910000000")
 
     listing = {
@@ -148,5 +149,5 @@ def test_load_template_ids_keeps_approved_only_and_normalises_language(
     channel_service._load_template_ids()
 
     assert fresh_cache == {("ticket_resolved", "en"): "a", ("ticket_resolved", "mr"): "c"}
-    assert get.call_args.args[0] == channel_service.TEMPLATE_LIST_URL.format(app_name="TestApp")
+    assert get.call_args.args[0] == channel_service.TEMPLATE_LIST_URL.format(app_id="app-uuid")
     assert get.call_args.kwargs["headers"] == {"apikey": "k"}
