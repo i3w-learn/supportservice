@@ -13,7 +13,7 @@ EN, HI, MR, BN = Language.EN, Language.HI, Language.MR, Language.BN
 
 # --- approved templates ---------------------------------------------------
 
-WELCOME_LANGUAGE = "welcome_language_select"
+WELCOME_LANGUAGE = "support_language_selection"
 ISSUE_CATEGORY = "new_user_issue_category"
 RETURNING_OPTIONS = "returning_user_options"
 UPLOAD_MEDIA = "upload_media_request"
