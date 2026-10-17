@@ -1,5 +1,5 @@
 import { Loader2, Lock } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
@@ -10,10 +10,13 @@ export function Login() {
   const { signIn, error, demo } = useAuth()
   const [busy, setBusy] = useState(false)
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  // Uncontrolled on purpose: a controlled input mirrors its value into the
+  // DOM `value` attribute, which shows the password in the Elements panel.
+  const passwordRef = useRef<HTMLInputElement>(null)
 
   const handle = async (e: React.FormEvent) => {
     e.preventDefault()
+    const password = passwordRef.current?.value ?? ""
     if (!email || !password) return
     setBusy(true)
     try {
@@ -44,10 +47,9 @@ export function Login() {
               required
             />
             <Input
+              ref={passwordRef}
               type="password"
               placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               required
             />
