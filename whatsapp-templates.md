@@ -146,6 +146,53 @@ Buttons: `ডিভাইস` · `সফটওয়্যার` · `অন্�
 
 > The PDF's longer labels ("Device / Hardware", "डिवाइस / हार्डवेयर") run past 20 characters in Indian scripts, so these short ones are used instead.
 
+## Template 2 on the B2G app — `support_issue_category`
+
+On the B2G app (918179921444) Meta put `new_user_issue_category` in **Marketing** on its
+first approval, and a name keeps its category for good: the hi/mr/bn versions were refused
+with "category UTILITY doesn't match … MARKETING", and an edited English body was
+re-approved but stayed Marketing. So that app sends the same prompt under a fresh name.
+The server picks the name from `TEMPLATE_ISSUE_CATEGORY` (see `backend/.env.example`);
+leave it unset on i3w, set it to `support_issue_category` on B2G.
+
+Variables: none · Label: `Support request update` · Buttons unchanged from template 2.
+
+### en
+```
+Your support request has been logged and is being processed.
+
+To route it to the right team, select the type of issue you are facing:
+```
+Footer: `Your selection helps us assign your request`
+Buttons: `Device` · `Software` · `Other`
+
+### hi
+```
+आपका सहायता अनुरोध दर्ज कर लिया गया है और उस पर काम चल रहा है।
+
+इसे सही टीम तक पहुँचाने के लिए, अपनी समस्या का प्रकार चुनें:
+```
+Footer: `आपका चयन हमें आपका अनुरोध सौंपने में मदद करता है`
+Buttons: `डिवाइस` · `सॉफ़्टवेयर` · `अन्य`
+
+### mr
+```
+तुमची सहाय्य विनंती नोंदवली गेली आहे आणि त्यावर काम सुरू आहे.
+
+ती योग्य टीमकडे पाठवण्यासाठी, तुमच्या समस्येचा प्रकार निवडा:
+```
+Footer: `तुमची निवड आम्हाला तुमची विनंती सोपवण्यात मदत करते`
+Buttons: `डिव्हाइस` · `सॉफ्टवेअर` · `इतर`
+
+### bn
+```
+আপনার সহায়তার অনুরোধ নথিভুক্ত হয়েছে এবং তা প্রক্রিয়াধীন আছে।
+
+সঠিক টিমের কাছে পাঠাতে, আপনার সমস্যার ধরন নির্বাচন করুন:
+```
+Footer: `আপনার নির্বাচন আমাদের আপনার অনুরোধ বরাদ্দ করতে সাহায্য করে`
+Buttons: `ডিভাইস` · `সফটওয়্যার` · `অন্যান্য`
+
 ---
 
 # Template 3 — returning_user_options
@@ -435,6 +482,11 @@ approved the same day.
 
 All 28 are Utility. The server reads the approved list from Gupshup every ten minutes,
 so a newly approved language starts being used without a deploy.
+
+**B2G app (918179921444), 27 Oct 2026:** 24 Utility approved (names 1, 3–7, all four
+languages). `new_user_issue_category` en is approved but Marketing, hi/mr/bn Failed, so it
+is replaced there by `support_issue_category` (section above): en submitted as Utility,
+hi/mr/bn to follow once en is approved as Utility.
 
 Approval takes 24–48 hours. Status shows Pending, then Approved or Rejected.
 

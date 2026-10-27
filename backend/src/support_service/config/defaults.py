@@ -6,6 +6,8 @@ are only for the handful of messages that are not templates: the nudge after an
 unrecognised tap, and the regional-language list.
 """
 
+import os
+
 from support_service.config.models import Category, ConfigSnapshot
 from support_service.models import Language
 
@@ -20,6 +22,17 @@ UPLOAD_MEDIA = "upload_media_request"
 TICKET_STATUS = "ticket_status_update"
 TICKET_CREATED = "ticket_created_confirmation"
 TICKET_RESOLVED = "ticket_resolved"
+
+
+def issue_category_template() -> str:
+    """The category prompt's template name, overridable per deployment.
+
+    Meta locked one app's copy of `new_user_issue_category` to Marketing, and
+    a name keeps its category for good, so that deployment sends the same
+    prompt under a fresh name. Set TEMPLATE_ISSUE_CATEGORY to use it.
+    """
+    return os.environ.get("TEMPLATE_ISSUE_CATEGORY", ISSUE_CATEGORY)
+
 
 # --- button labels --------------------------------------------------------
 #

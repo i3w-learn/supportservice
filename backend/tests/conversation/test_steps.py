@@ -117,6 +117,17 @@ class TestOpening:
         assert turn.session is not None
         assert turn.session.step is Step.CATEGORY
 
+    def test_the_category_template_name_can_be_overridden_per_deployment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Meta locked one app's copy of the name to Marketing, so that
+        # deployment sends the same prompt under a fresh name.
+        monkeypatch.setenv("TEMPLATE_ISSUE_CATEGORY", "support_issue_category")
+
+        turn = begin(Contact(wa_number=WA, language=Language.MR), CONFIG, now=NOW)
+
+        assert only_template(turn).name == "support_issue_category"
+
 
 class TestLanguageStep:
     @pytest.mark.parametrize(

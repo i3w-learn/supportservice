@@ -278,7 +278,7 @@ def _offer_again(draft: dict[str, str], language: Language, now: datetime) -> Tu
 
 def _ask_category(language: Language, *, now: datetime, draft: dict[str, str]) -> Turn:
     return Turn(
-        replies=(SendTemplate(defaults.ISSUE_CATEGORY, language),),
+        replies=(SendTemplate(defaults.issue_category_template(), language),),
         session=_session(Step.CATEGORY, draft, now),
     )
 
