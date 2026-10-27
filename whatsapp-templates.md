@@ -485,8 +485,8 @@ so a newly approved language starts being used without a deploy.
 
 **B2G app (918179921444), 27 Oct 2026:** 24 Utility approved (names 1, 3–7, all four
 languages). `new_user_issue_category` en is approved but Marketing, hi/mr/bn Failed, so it
-is replaced there by `support_issue_category` (section above): en submitted as Utility,
-hi/mr/bn to follow once en is approved as Utility.
+is replaced there by `support_issue_category` (section above): en approved as Utility the
+same afternoon; hi/mr/bn submitted as Utility right after, pending.
 
 Approval takes 24–48 hours. Status shows Pending, then Approved or Rejected.
 
