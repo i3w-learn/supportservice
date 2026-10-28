@@ -1,6 +1,6 @@
 // Stand-in for the Firestore listeners in §4.2. Swap for onSnapshot once the
 // backend exists; the shapes are already the real ones.
-import type { Ticket } from "./types"
+import type { Centre, Ticket } from "./types"
 
 const HOUR = 3_600_000
 const ago = (hours: number) => Date.now() - hours * HOUR
@@ -8,11 +8,34 @@ const ago = (hours: number) => Date.now() - hours * HOUR
 let seq = 0
 const id = (prefix: string) => `${prefix}-${++seq}`
 
+export const MOCK_CENTRES: Record<string, Centre> = {
+  "NGP-AWC-017": {
+    centreId: "NGP-AWC-017",
+    block: "सावनेर",
+    blockEn: "Savner",
+    village: "टेकाडी",
+    villageEn: "Tekadi",
+    workerName: "Sunita Devi",
+    workerPhone: "918827450192",
+    fieldPerson: "Rahul Meshram",
+    smartBoardSerial: "SB-2026-00417",
+    vrHeadsets: "4",
+    warrantyEnds: "2027-03-31",
+  },
+}
+
 export const MOCK_TICKETS: Ticket[] = [
   {
     ticketId: "TKT-20260908-0042",
     waNumber: "918827450192",
     contactName: "Sunita Devi",
+    centre: {
+      centreId: "NGP-AWC-017",
+      block: "सावनेर",
+      blockEn: "Savner",
+      village: "टेकाडी",
+      villageEn: "Tekadi",
+    },
     categoryId: "device",
     categoryLabel: "डिवाइस",
     language: "hi",

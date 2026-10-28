@@ -2,6 +2,7 @@
 import {
   collection,
   collectionGroup,
+  doc,
   onSnapshot,
   orderBy,
   query,
@@ -12,8 +13,8 @@ import type { QueryDocumentSnapshot, Unsubscribe } from "firebase/firestore"
 import { useEffect, useState } from "react"
 
 import { db, isFirebaseConfigured } from "@/firebase"
-import { MOCK_TICKETS } from "./mock"
-import type { Message, Ticket, TicketEvent } from "./types"
+import { MOCK_CENTRES, MOCK_TICKETS } from "./mock"
+import type { Centre, Message, Ticket, TicketEvent } from "./types"
 
 // The backend writes datetimes, which Firestore hands back as Timestamp
 // objects. Everything downstream (types.ts, window.ts) works in epoch ms.
@@ -117,4 +118,27 @@ export function useTicketDetail(ticketId: string | null): {
   }, [ticketId])
 
   return { messages, events }
+}
+
+/** The full centre record behind a ticket's `centre` field, live. */
+export function useCentre(centreId: string | null | undefined): Centre | null {
+  const [centre, setCentre] = useState<Centre | null>(null)
+
+  useEffect(() => {
+    if (!centreId) {
+      setCentre(null)
+      return
+    }
+    if (!isFirebaseConfigured || !db) {
+      setCentre(MOCK_CENTRES[centreId] ?? null)
+      return
+    }
+    return onSnapshot(
+      doc(db, "centres", centreId),
+      (snap) => setCentre(snap.exists() ? (toPlain(snap.data()) as Centre) : null),
+      (err) => console.error("centre listener error:", err),
+    )
+  }, [centreId])
+
+  return centre
 }

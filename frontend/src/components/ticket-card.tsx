@@ -61,6 +61,11 @@ export function TicketCard({
       )}
     >
       <p className="text-[13px] leading-snug text-foreground">{ticket.categoryLabel}</p>
+      {ticket.centre && (
+        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+          {ticket.centre.villageEn} · {ticket.centre.blockEn}
+        </p>
+      )}
 
       <div className="mt-3 flex items-center gap-2">
         <span

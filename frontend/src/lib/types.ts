@@ -56,9 +56,34 @@ export interface Resolution {
   attempts: number
 }
 
+/** The slice of an Anganwadi centre copied onto a contact and its tickets,
+ *  so the board can show and filter by it without a join. */
+export interface CentreRef {
+  centreId: string
+  block: string
+  blockEn: string
+  village: string
+  villageEn: string
+}
+
+/** One document in `centres/`, imported from the centre sheet. Any column
+ *  the sheet gains (hardware serials, warranty dates) lands here as an extra
+ *  field, so everything beyond the named ones is shown generically. */
+export interface Centre extends CentreRef {
+  serial?: string
+  govtCode?: string
+  workerName?: string
+  workerPhone?: string
+  fieldPerson?: string
+  [extra: string]: unknown
+}
+
 export interface Ticket {
   ticketId: string
   waNumber: string
+  /** The centre the QR code (or the worker's phone) tied the contact to.
+   *  Absent on tickets from before QR codes, and when nothing matched. */
+  centre?: CentreRef | null
   /** Null unless the contact gave a name in an earlier flow — the template
    *  flow never asks for one. */
   contactName: string | null

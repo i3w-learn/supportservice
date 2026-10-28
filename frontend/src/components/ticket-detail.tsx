@@ -7,9 +7,11 @@ import {
   Film,
   ImageIcon,
   Loader2,
+  MapPin,
   ShieldCheck,
 } from "lucide-react"
 
+import { CentrePanel } from "@/components/centre-panel"
 import { CategoryTag, FailedLozenge, SlaLozenge, StatusLozenge } from "@/components/lozenge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -105,6 +107,17 @@ export function TicketDetail({
           <span aria-hidden>·</span>
           <span>{LANGUAGES[ticket.language]}</span>
         </div>
+        {ticket.centre && (
+          <div className="flex flex-wrap items-center gap-x-2 text-xs">
+            <MapPin className="size-3.5 text-muted-foreground" aria-hidden />
+            <span className="font-medium text-foreground">
+              {ticket.centre.village} · {ticket.centre.villageEn}
+            </span>
+            <span className="text-muted-foreground">
+              {ticket.centre.blockEn} · {ticket.centre.centreId}
+            </span>
+          </div>
+        )}
       </header>
 
       <ReplyWindowBar ticket={ticket} />
@@ -113,6 +126,7 @@ export function TicketDetail({
         <TabsList className="mx-5 mt-3 self-start">
           <TabsTrigger value="conversation">Conversation</TabsTrigger>
           <TabsTrigger value="activity">Activity · {events.length}</TabsTrigger>
+          <TabsTrigger value="centre">Centre</TabsTrigger>
         </TabsList>
 
         <TabsContent value="conversation" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
@@ -121,6 +135,10 @@ export function TicketDetail({
 
         <TabsContent value="activity" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <ActivityLog events={events} />
+        </TabsContent>
+
+        <TabsContent value="centre" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <CentrePanel centre={ticket.centre} />
         </TabsContent>
       </Tabs>
 

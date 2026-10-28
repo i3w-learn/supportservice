@@ -4,7 +4,8 @@ import { ChevronRight, Loader2, LogOut } from "lucide-react"
 import { Board } from "@/components/board"
 import { Login } from "@/components/login"
 import { NotAuthorised } from "@/components/not-authorised"
-import { Sidebar, needsAttention } from "@/components/sidebar"
+import { Report } from "@/components/report"
+import { Sidebar, blockOf, needsAttention } from "@/components/sidebar"
 import type { ViewKey } from "@/components/sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { TicketDetail } from "@/components/ticket-detail"
@@ -42,6 +43,7 @@ export default function App() {
   }, [demo, liveTickets])
 
   const [category, setCategory] = useState<CategoryId | "all">("all")
+  const [block, setBlock] = useState<string | "all">("all")
   const [view, setView] = useState<ViewKey>("all")
   const [query, setQuery] = useState("")
   const [openId, setOpenId] = useState<string | null>(null)
@@ -59,13 +61,17 @@ export default function App() {
     const needle = query.trim().toLowerCase()
     return tickets.filter((t) => {
       if (category !== "all" && t.categoryId !== category) return false
+      if (block !== "all" && blockOf(t) !== block) return false
       if (view === "attention" && !needsAttention(t)) return false
       if (!needle) return true
-      return `${t.ticketId} ${t.waNumber} ${t.contactName ?? ""} ${t.categoryLabel} ${t.description}`
+      const centre = t.centre
+        ? `${t.centre.centreId} ${t.centre.village} ${t.centre.villageEn} ${t.centre.block} ${t.centre.blockEn}`
+        : ""
+      return `${t.ticketId} ${t.waNumber} ${t.contactName ?? ""} ${t.categoryLabel} ${t.description} ${centre}`
         .toLowerCase()
         .includes(needle)
     })
-  }, [tickets, category, view, query])
+  }, [tickets, category, block, view, query])
 
   const selectedTicket = tickets.find((t) => t.ticketId === openId) ?? null
   // In live mode the ticket doc itself carries no messages/events — those
@@ -355,7 +361,9 @@ export default function App() {
           </nav>
 
           <div className="mt-1.5 flex items-center gap-3">
-            <h1 className="text-xl font-semibold tracking-tight">Board</h1>
+            <h1 className="text-xl font-semibold tracking-tight">
+              {view === "report" ? "Report" : "Board"}
+            </h1>
 
             <Input
               value={query}
@@ -413,12 +421,18 @@ export default function App() {
             tickets={tickets}
             view={view}
             category={category}
+            block={block}
             onView={setView}
             onCategory={setCategory}
+            onBlock={setBlock}
           />
 
           <main className="min-h-0 flex-1 pt-4">
-            <Board tickets={visible} onOpen={setOpenId} onMove={handleMove} />
+            {view === "report" ? (
+              <Report tickets={visible} />
+            ) : (
+              <Board tickets={visible} onOpen={setOpenId} onMove={handleMove} />
+            )}
           </main>
         </div>
 
