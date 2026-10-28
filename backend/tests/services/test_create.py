@@ -98,3 +98,28 @@ def test_both_deadline_checks_are_scheduled(db, enqueued: MagicMock) -> None:
 
     sla = [c for c in enqueued.call_args_list if c.args[0] == "/tasks/sla"]
     assert [c.args[1] for c in sla] == [{"ticket_id": ticket_id}] * 2
+
+
+@pytest.mark.firestore
+def test_copies_the_contacts_centre_onto_the_ticket(db) -> None:
+    centre = {
+        "centreId": "NGP-AWC-017",
+        "block": "सावनेर",
+        "blockEn": "Savner",
+        "village": "टेकाडी",
+        "villageEn": "Tekadi",
+    }
+    db.collection("contacts").document(WA_NUMBER).update({"centre": centre})
+
+    ticket_id = create_ticket(_draft(), WA_NUMBER, now=NOW)
+
+    ticket = db.collection("tickets").document(ticket_id).get().to_dict()
+    assert ticket["centre"] == centre
+
+
+@pytest.mark.firestore
+def test_a_contact_without_a_centre_files_an_unplaced_ticket(db) -> None:
+    ticket_id = create_ticket(_draft(), WA_NUMBER, now=NOW)
+
+    ticket = db.collection("tickets").document(ticket_id).get().to_dict()
+    assert ticket["centre"] is None

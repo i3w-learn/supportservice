@@ -1,0 +1,67 @@
+centre_id,serial,block,block_en,village,village_en
+NGP-AWC-001,1,रामटेक,Ramtek,शिवणीटोला,Shivanitola
+NGP-AWC-002,2,रामटेक,Ramtek,किरणापूर,Kiranapur
+NGP-AWC-003,3,रामटेक,Ramtek,खोडगाव,Khodgaon
+NGP-AWC-004,4,रामटेक,Ramtek,हिवरा बाजार 1,Hiwara Bazar 1
+NGP-AWC-005,5,रामटेक,Ramtek,पंचाळा-2,Panchala-2
+NGP-AWC-006,6,काटोल,Katol,खानगाव,Khangaon
+NGP-AWC-007,7,काटोल,Katol,खुर्सापार,Khursapar
+NGP-AWC-008,8,काटोल,Katol,गोंडीदिग्रस-2,Gondidigras-2
+NGP-AWC-009,9,काटोल,Katol,लाडगाव,Ladgaon
+NGP-AWC-010,10,काटोल,Katol,चंदनपारडी-2,Chandanpardi-2
+NGP-AWC-011,11,काटोल,Katol,खैरी (चिखली),Khairi (Chikhali)
+NGP-AWC-012,12,काटोल,Katol,सावळी (पर्वत),Sawali (Parvat)
+NGP-AWC-013,13,कळमेश्वर,Kalmeshwar,लिंगा-1,Linga-1
+NGP-AWC-014,14,कळमेश्वर,Kalmeshwar,सिंदी,Sindi
+NGP-AWC-015,15,कळमेश्वर,Kalmeshwar,तेकामठी-4,Tekamathi-4
+NGP-AWC-016,16,कळमेश्वर,Kalmeshwar,वाढोणा,Wadhona
+NGP-AWC-017,17,सावनेर,Savner,टेकाडी,Tekadi
+NGP-AWC-018,18,सावनेर,Savner,भागेमाहेरी,Bhagemaheri
+NGP-AWC-019,19,सावनेर,Savner,केळवद-5,Kelwad-5
+NGP-AWC-020,20,सावनेर,Savner,माळेगाव-2,Malegaon-2
+NGP-AWC-021,21,सावनेर,Savner,वाकोडी-4,Wakodi-4
+NGP-AWC-022,22,भिवापूर,Bhiwapur,तास 1,Tas 1
+NGP-AWC-023,23,भिवापूर,Bhiwapur,बेसूर 1,Besur 1
+NGP-AWC-024,24,पारशिवनी,Parshivani,जुनी कामठी,Juni Kamthi
+NGP-AWC-025,25,पारशिवनी,Parshivani,बछेरा टोली,Bachhera Toli
+NGP-AWC-026,26,पारशिवनी,Parshivani,सकरला,Sakarla
+NGP-AWC-027,27,नरखेड,Narkhed,महेंद्री,Mahendri
+NGP-AWC-028,28,नरखेड,Narkhed,सावरगाव 1,Sawargaon 1
+NGP-AWC-029,29,नरखेड,Narkhed,शेबडा,Shebda
+NGP-AWC-030,30,नरखेड,Narkhed,जलालखेडा 6,Jalalkheda 6
+NGP-AWC-031,31,नरखेड,Narkhed,पिंपळगाव (वखाजी),Pimpalgaon (Vakhaji)
+NGP-AWC-032,32,कुही,Kuhi,साळवा-2,Salwa-2
+NGP-AWC-033,33,कुही,Kuhi,गोठणगाव,Gothangaon
+NGP-AWC-034,34,कुही,Kuhi,तारणा-3,Tarna-3
+NGP-AWC-035,35,कुही,Kuhi,आकोली-1,Akoli-1
+NGP-AWC-036,36,कुही,Kuhi,भोजापूर,Bhojapur
+NGP-AWC-037,37,उमरेड,Umred,उंदरी,Undri
+NGP-AWC-038,38,उमरेड,Umred,खुर्सापार,Khursapar
+NGP-AWC-039,39,उमरेड,Umred,गावसुत,Gawsut
+NGP-AWC-040,40,उमरेड,Umred,पिपरा-2,Pipra-2
+NGP-AWC-041,41,उमरेड,Umred,सालई (नवेगाव),Salai (Navegaon)
+NGP-AWC-042,42,उमरेड,Umred,बेला-7,Bela-7
+NGP-AWC-043,43,उमरेड,Umred,खापरी (कुरळकर),Khapri (Kuralkar)
+NGP-AWC-044,44,उमरेड,Umred,कुंभारी,Kumbhari
+NGP-AWC-045,45,उमरेड,Umred,उदासा-3,Udasa-3
+NGP-AWC-046,46,हिंगणा,Hingna,सावंगी (देवळी),Sawangi (Deoli)
+NGP-AWC-047,47,हिंगणा,Hingna,गुमगाव-116,Gumgaon-116
+NGP-AWC-048,48,हिंगणा,Hingna,गणेशपूर-2,Ganeshpur-2
+NGP-AWC-049,49,हिंगणा,Hingna,रायपूर-4,Raipur-4
+NGP-AWC-050,50,नागपुर ग्रामिण,Nagpur Rural,सावंगा,Sawanga
+NGP-AWC-051,51,नागपुर ग्रामिण,Nagpur Rural,येरला 2,Yerla 2
+NGP-AWC-052,52,नागपुर ग्रामिण,Nagpur Rural,गोदावरी नगर,Godavari Nagar
+NGP-AWC-053,53,नागपुर ग्रामिण,Nagpur Rural,कवठा,Kawtha
+NGP-AWC-054,54,नागपुर ग्रामिण,Nagpur Rural,बोरखेड़ी -3,Borkhedi-3
+NGP-AWC-055,55,नागपुर ग्रामिण,Nagpur Rural,तलमले ले आउट,Talmale Layout
+NGP-AWC-056,56,नागपुर ग्रामिण,Nagpur Rural,गणेश नगर,Ganesh Nagar
+NGP-AWC-057,57,मौदा,Mauda,मांगली (तेली),Mangli (Teli)
+NGP-AWC-058,58,मौदा,Mauda,धानला,Dhanla
+NGP-AWC-059,59,कामठी,Kamptee,सावळी,Sawali
+NGP-AWC-060,60,कामठी,Kamptee,महालगाव 3,Mahalgaon 3
+NGP-AWC-061,61,कामठी,Kamptee,पोवारी,Powari
+NGP-AWC-062,62,कामठी,Kamptee,कवठा,Kawtha
+NGP-AWC-063,63,कामठी,Kamptee,म्हसाळा टोली,Mhasala Toli
+NGP-AWC-064,64,कामठी,Kamptee,वारेगाव 1,Waregaon 1
+NGP-AWC-065,65,कामठी,Kamptee,भुगाव 4,Bhugaon 4
+NGP-AWC-066,66,कामठी,Kamptee,कोराडी-1,Koradi-1

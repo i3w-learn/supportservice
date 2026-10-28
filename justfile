@@ -53,6 +53,11 @@ build:
 seed:
     cd backend && uv run python -m support_service.seed
 
+# Load the Anganwadi centre list (QR codes point at these) into Firestore.
+# Re-run whenever backend/data/centres.csv changes; existing fields merge.
+centres:
+    cd backend && uv run python -m support_service.centres data/centres.csv
+
 # --- emulators ---
 
 # Java 21+ only — the Firestore emulator is a JVM program. brew installs

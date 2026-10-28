@@ -68,6 +68,9 @@ def create_ticket(draft: Draft, wa_number: str, *, now: datetime | None = None) 
                 "wa_number": wa_number,
                 # The WhatsApp profile name — the flow no longer asks for one.
                 "contact_name": contact_data.get("displayName"),
+                # The Anganwadi centre the QR code (or worker phone) tied to
+                # the contact; copied so the board can filter without a join.
+                "centre": contact_data.get("centre"),
                 "category_id": draft.category_id,
                 "category_label": config.category_label(draft.category_id, language),
                 "language": language,

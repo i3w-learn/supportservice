@@ -123,12 +123,28 @@ class Session(BaseModel):
     last_activity_at: datetime
 
 
+class CentreRef(BaseModel):
+    """The slice of an Anganwadi centre copied onto a contact and its tickets.
+
+    Enough to show and filter by on the dashboard without a join. The full
+    centre record (worker, hardware, warranty) lives in `centres/{centre_id}`.
+    """
+
+    centre_id: str
+    block: str
+    block_en: str
+    village: str
+    village_en: str
+
+
 class Contact(BaseModel):
     """Root record, one per phone number (§5)."""
 
     wa_number: str
     display_name: str | None = None
     language: Language | None = None
+    """Set by a QR-code greeting, or by matching the worker's phone number."""
+    centre: CentreRef | None = None
     session: Session | None = None
     open_ticket_ids: list[str] = Field(default_factory=list)
     last_inbound_at: datetime | None = None

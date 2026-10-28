@@ -50,6 +50,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // The Anganwadi centre master list (QR codes point at these). Written
+    // only by the import script, read by the ticket detail's centre panel.
+    match /centres/{centreId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /config/{document=**} {
       allow read: if isAdmin();
       allow write: if false;

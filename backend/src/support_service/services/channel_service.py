@@ -24,6 +24,7 @@ from ulid import ULID
 from support_service.config import defaults
 from support_service.config.defaults import seed
 from support_service.config.models import ConfigSnapshot
+from support_service.conversation.centres import parse_centre_id
 from support_service.conversation.routing import (
     ContinueSession,
     OfferReturningOptions,
@@ -55,6 +56,10 @@ from support_service.models import (
     TicketStatus,
 )
 from support_service.repositories.base import from_firestore, get_db, to_firestore
+from support_service.repositories.centre_repository import (
+    find_centre,
+    find_centre_by_worker_phone,
+)
 from support_service.services import task_service
 
 log = logging.getLogger(__name__)
@@ -348,6 +353,7 @@ def handle_inbound(raw: dict[str, Any]) -> None:
     contact = _drop_stale_session(
         db, Contact(**from_firestore(contact_data)), message.wa_number, config, now
     )
+    contact = _bind_centre(db, contact, message, now)
 
     _append_message(db, message, now)
     _update_last_inbound(db, message.wa_number, now)
@@ -442,6 +448,37 @@ def _drop_stale_session(
         return contact
     db.collection("contacts").document(wa_number).update({"session": None, "updatedAt": now})
     return contact.model_copy(update={"session": None})
+
+
+def _bind_centre(db: Any, contact: Contact, message: InboundMessage, now: datetime) -> Contact:
+    """Tie the contact to an Anganwadi centre.
+
+    A QR-code greeting names one outright, and scanning a QR means "start
+    again", so any half-finished flow is dropped. Without an id, a contact not
+    yet tied to a centre is matched by the worker's phone number in the master
+    list. Neither match is required: an unbound ticket is filed as before and
+    an admin can place it by hand.
+    """
+    centre_id = parse_centre_id(message.text)
+    if centre_id is not None:
+        centre = find_centre(db, centre_id)
+        if centre is None:
+            log.warning("Greeting names unknown centre %s; not bound", centre_id)
+            return contact
+        db.collection("contacts").document(message.wa_number).update(
+            to_firestore({"centre": centre.model_dump(), "session": None, "updated_at": now})
+        )
+        return contact.model_copy(update={"centre": centre, "session": None})
+
+    if contact.centre is not None:
+        return contact
+    centre = find_centre_by_worker_phone(db, message.wa_number)
+    if centre is None:
+        return contact
+    db.collection("contacts").document(message.wa_number).update(
+        to_firestore({"centre": centre.model_dump(), "updated_at": now})
+    )
+    return contact.model_copy(update={"centre": centre})
 
 
 def _schedule_idle_check(wa_number: str, session: Session, config: ConfigSnapshot) -> None:

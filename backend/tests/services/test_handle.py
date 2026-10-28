@@ -372,3 +372,85 @@ class TestStaleSession:
         handle_inbound(_raw_tap("Device"))
 
         assert _templates(sent)[0].name == defaults.UPLOAD_MEDIA
+
+
+class TestCentreBinding:
+    """A QR-code greeting names the Anganwadi centre; it sticks to the contact."""
+
+    CENTRE = {
+        "centreId": "NGP-AWC-017",
+        "block": "सावनेर",
+        "blockEn": "Savner",
+        "village": "टेकाडी",
+        "villageEn": "Tekadi",
+    }
+
+    def _centre_doc(self, mock_db: MagicMock, exists: bool = True) -> None:
+        snapshot = MagicMock()
+        snapshot.exists = exists
+        snapshot.to_dict.return_value = self.CENTRE if exists else None
+        mock_db.collection("centres").document.return_value.get.return_value = snapshot
+        mock_db.collection("centres").where.return_value.limit.return_value.get.return_value = []
+
+    def _bound_centres(self, mock_db: MagicMock) -> list[dict]:
+        contact_doc = mock_db.collection("contacts").document.return_value
+        return [
+            c.args[0]["centre"] for c in contact_doc.update.call_args_list if "centre" in c.args[0]
+        ]
+
+    def test_a_qr_greeting_binds_the_centre_to_the_contact(
+        self, mock_db: MagicMock, sent: MagicMock
+    ) -> None:
+        self._centre_doc(mock_db)
+
+        handle_inbound(_raw_text(text="Hi, I need support. Centre ID: NGP-AWC-017"))
+
+        mock_db.collection("centres").document.assert_called_with("NGP-AWC-017")
+        assert self._bound_centres(mock_db) == [self.CENTRE]
+        # The flow itself is unchanged: a new contact is asked for a language.
+        assert _templates(sent)[0].name == defaults.WELCOME_LANGUAGE
+
+    def test_an_unknown_centre_id_is_ignored(self, mock_db: MagicMock, sent: MagicMock) -> None:
+        self._centre_doc(mock_db, exists=False)
+
+        handle_inbound(_raw_text(text="Hi, I need support. Centre ID: NGP-AWC-999"))
+
+        assert self._bound_centres(mock_db) == []
+        assert _templates(sent)[0].name == defaults.WELCOME_LANGUAGE
+
+    def test_a_plain_hi_falls_back_to_the_workers_phone_number(
+        self, mock_db: MagicMock, sent: MagicMock
+    ) -> None:
+        match = MagicMock()
+        match.id = "NGP-AWC-017"
+        match.to_dict.return_value = self.CENTRE
+        centres = mock_db.collection("centres")
+        centres.where.return_value.limit.return_value.get.return_value = [match]
+
+        handle_inbound(_raw_text(text="Hi"))
+
+        centres.where.assert_called_once_with("workerPhone", "==", WA_NUMBER)
+        assert self._bound_centres(mock_db) == [self.CENTRE]
+
+    def test_an_already_bound_contact_is_not_looked_up_again(
+        self, mock_db: MagicMock, sent: MagicMock
+    ) -> None:
+        mock_db.collection("contacts").document.return_value.get.return_value = _contact_snapshot(
+            centre=self.CENTRE
+        )
+
+        handle_inbound(_raw_text(text="Hi"))
+
+        mock_db.collection("centres").where.assert_not_called()
+        assert self._bound_centres(mock_db) == []
+
+    def test_scanning_a_qr_mid_flow_starts_over(self, mock_db: MagicMock, sent: MagicMock) -> None:
+        self._centre_doc(mock_db)
+        mock_db.collection("contacts").document.return_value.get.return_value = _contact_snapshot(
+            language="en", session=_session("media", language="en", category_id="device")
+        )
+
+        handle_inbound(_raw_text(text="Hi, I need support. Centre ID: NGP-AWC-017"))
+
+        # Not swallowed by the media step: the category question is asked afresh.
+        assert _templates(sent)[0].name == defaults.issue_category_template()
