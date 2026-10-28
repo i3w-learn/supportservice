@@ -24,8 +24,10 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "hypothesis>=6.167.1",
+    "pillow>=11.0",
     "pyright>=1.1.411",
     "pytest>=9.1.1",
+    "qrcode[pil]>=8.0",
     "ruff>=0.16.6",
 ]
 

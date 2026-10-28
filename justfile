@@ -58,6 +58,11 @@ seed:
 centres:
     cd backend && uv run python -m support_service.centres data/centres.csv
 
+# One WhatsApp QR per centre into docs/qr/ (PNG each, plus a printable PDF).
+# Re-run after editing centres.csv or changing the support number.
+qr:
+    cd backend && uv run python -m support_service.qr data/centres.csv ../docs/qr
+
 # --- emulators ---
 
 # Java 21+ only — the Firestore emulator is a JVM program. brew installs
