@@ -1,0 +1,161 @@
+<!doctype html><html lang="mr"><head><meta charset="utf-8"><title>School WhatsApp support QR codes</title><style>
+  @page { size: A4; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Helvetica Neue", Arial, "Kohinoor Devanagari",
+         "Devanagari Sangam MN", sans-serif; color: #111; }
+  .sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm;
+           page-break-after: always; }
+  .sheet:last-child { page-break-after: auto; }
+  .card { border: 0.6mm solid #111; border-radius: 4mm; padding: 6mm 5mm;
+          height: 133mm; display: flex; flex-direction: column; align-items: center;
+          text-align: center; break-inside: avoid; }
+  h1 { font-size: 15pt; margin: 0 0 3mm; letter-spacing: 0.02em; }
+  h1 span { display: block; font-size: 9pt; font-weight: normal; color: #444; }
+  img { width: 62mm; height: 62mm; image-rendering: pixelated; }
+  .scan { font-size: 10pt; margin: 3mm 0 2mm; }
+  .village { font-size: 16pt; font-weight: bold; margin: 0; line-height: 1.3; }
+  .village small { display: block; font-size: 10pt; font-weight: normal; color: #444; }
+  .block { font-size: 10pt; margin: 1.5mm 0 0; color: #333; }
+  .id { font-family: Menlo, monospace; font-size: 12pt; font-weight: bold;
+        margin: 3mm 0 0; letter-spacing: 0.08em; }
+  .phone { font-size: 9pt; color: #444; margin: 1.5mm 0 0; }
+
+  /* One card per A4 page: same layout, roughly double the size. */
+  .single { grid-template-columns: 1fr; }
+  .single .card { height: 270mm; padding: 16mm 12mm; justify-content: center; }
+  .single h1 { font-size: 30pt; margin-bottom: 8mm; }
+  .single h1 span { font-size: 16pt; }
+  .single img { width: 120mm; height: 120mm; }
+  .single .scan { font-size: 18pt; margin: 8mm 0 5mm; }
+  .single .village { font-size: 28pt; }
+  .single .village small { font-size: 16pt; }
+  .single .block { font-size: 18pt; margin-top: 4mm; }
+  .single .id { font-size: 22pt; margin-top: 8mm; }
+  .single .phone { font-size: 16pt; margin-top: 4mm; }
+</style></head><body><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAElUlEQVR4nO1dW2rjQBCsbgvyKUMOsEeRbxZypL1BfJQcYMH6DEj00j1PLwTFkzhZSV0fwiOriEcqevqlCQnacOZGIuDMJfDiFe/BmUvgxSvegzPveodGijhh1gNAp7HTAxHRUYf6hX2K6PypfAC8EyZELgcxYLjoUD+FLwwXAIN9mw6B8bKuebIz73yHKJgWHIToOJMpp1gfeUE8BKOlpsqfyjJ4l8yZzBjRCWppcFDbdBDAlrY7/c1bwDddXcOZ97tDXT3oJx0eBOdfEwj9nw7nX28k59MBcj5evuhvsjM3qCGJI7U5urQNr90kwAwMvzvQIDOJngN6vWL8qV/LzvxP79Acgq24ZI3RNNFpfFDB2Fr2IGEtO9uVx5/8tW3gRh6cuQypYHGZOUCmnF7ioURjBR6XLYL3wxyz4TFXyOIyeSMMr51GYzPJ83GmYK9yrLbCeTaCW4nYCxPB8Gj4JS/9pGd0aJYmBGcW1kezFI2R54c2qAT+1Fo2peRP8KnTQaN8RDXppyIfE9e65snOvKsdgsLskCRjlLwgWH4oJImyWXJ/6GPgndmhfqpKGlElJqmwjE1Ra17r2KwSuJmJqBc1MllNydxMVdSW1rLoHvlatjUlcDMTRSrJAUpCynpBQDiXAnz3hzamBP4Mc3zQSisgzxaz6/ApFM2ulGOOtUb+MQ25unk2gluJ2BlzuMxET2qCopBUJZZjHIlMOdU5raatdJ4N4BbSrpioUj4xWZ1iMF3kEBJHdmXKHrk/tEkl8KdzjGJxWToEvYS4DFfK0UHQ1brmyc78Dg1JtkglbS1xqFde+dmuoWXwTpiIldaQGrIIzeKy2BCLuJZdrXRuh7aoBG5mIrg98VPOU+d1CyFdVOofuZq2rnmyM+9ctxdVTmyqtqF+FVr0X7WJyLLYoSYyUxSXP5Ul8H6Y/QR60j6PWDlT6DltBaHwqpAV74OByomj1c2zEdxKxF6YqFLUodKaHevSg4aqjJ9TjuuaJzvz3nX7ITnWqRUklvFR9YMkP9trHR8E76/mitDiYSF8SRddUr2suNNuh7aoBP6K2F5yYrpKKkopsoY+xtyXtq55sjO/xR8aks2pckbIZikuaDny96eyBN5fT7689G8pcDepjEQW24e3hEJTSI781zfPRnArEXthonojKIRkVToaqcExfSp+k9uhrSmBm5lIhXpTSeqFzSGZlAJZKYeEJtl1zZOd+R3vBiHH8Vc91lM2VYniPvXHwPt9zxWpSpYTQv+aJbdDG1QCf80+aL3E1+r1FddSG6O8bUwpfaxwno3gViL2wuzUvoRCmL4OrVvEHCbtdu1ouEBsAxk5n3QbkPERolt+yBrnyc68q4ag8jEhzR10nxg7LxiP2QGyc6YyvW58nPypLIN3yTyIPFPMBRFZ672mhs62oV54C/aNYvbo53/tLeCbrq7hzJv2QYNuX3V5VOUcdcma1RjZMLhHenwQGizJ6Pd2CbzHfWEldTRWmSKUb33fjy0rgZuZqPM+ObbPOzVI9f50yVN7zXWDSuBmJvn/WtjU82RnLoCXLngXzlxC+x36C4s/8qCKY02YAAAAAElFTkSuQmCC" alt="QR for NGP-ZPS-001">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Adyal</p>
+      <p class="block">भिवापूर · Bhiwapur</p>
+      <p class="id">NGP-ZPS-001</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEZUlEQVR4nO1dXYrjMAyWlcA8JrAHmKOkN1vmSHOD5Cg9wEL7WEjRItmy3S4lHbdZiCM9hDjOR3HmQ//2OIIymbAQCGDIJcHFNx6JIZcEF994JIZc9QudXZADXJ1zPYA+aCF7doB8wv4qy4I7QQLRqSERGGgGGvnhoEOAbtb3/DMWRozbWicacuUv5LxqYREiffVy3xDRsQ288sJKizWS/VWWBfeKnNwHiQWDyTkH0+cM7sDKaIo0e/tvPi34/Kt3Ysj/9YUacr/p4mA4NSQXdwC+O37wcJ3f/Ingj97OxZDrfaFWriHAP/dAcplcM8PUNwDDCEDT58UFz6jjV8+v/SYasjqfGoJE7fP4EsR86vqYgMXINqgWL+z2fIq6uTjRPiQ6Z+rByTxtdp1oyLVj+5ENlXg8fKFRvCAZcpjmw3+Z6HwewGL7JwR3pIcurG5adoUa1kEz+0hXcYBa72cPI7/COQDorow4bW6daMiV9RBEnZM9g04TjT4kk6FXVeYPPSO4EyQQ3VkrySyKteLpkLuWZ3zHRGI2WZ66Nibg6xyCvK7B7lE2MXhKiW5SSlmtozIm4Ov1slkrYqe8NgY+jk85AE8u00P1MQGLkRBsFKifIwYtmLZGU0PCpi5RyvRQfUzAYiQkkxX0i1gr8XiiEy1GLrIpzG5rnWjIlfPUJPkhX6j3ekhnR80UZQwzW/ac4K70EGRuj4Zp8gxibK/xftBIpodqYwIWI0F9ZfF4fFU1OEAxRQ2BQ5FI5g9VyAQsRoKPwYIZ08xiYhOkhJBOmC2rkglYjITMAbpLR6cYjHzkH2ye5RirZAK+XnMlpYqmi1LvNHir5vPUlmOslAlYjGz1hmupLNOhATd8/yKYetFGXH3lwit0f8BxR6OzmmuNTMBXkQO33mcFDx/qX520Uoee/DOzLA03uc4CwRLQPvPUjXrSPiukZfwh1e2TK2RxWYVMwGIkBF9Z/aGbZ3OsnKkrFAln+aHamICvIM9sxo68b0zumD68QcgXNya/I4g3fBxb7oqN+mpz6ywULAXCXpCQ6RyvX1Td3O1zhRj5mx6qkgn4nnpZlzKL0XXuNOUYKGV7pStlAhYjQXsWY09H7ICNPhKF2dCTb/WyKpmAL+cYQYfelsU8NUu6yyas96MyJmAxEjxLQl+QFsNCZzXLjXukHY3GofqYgMVIyHo64jBZNUotaWk/rOmhGpmAxUhQIyUs0Sxi1vFBscf6pj/WbFltTMD37LenVLK/0UgsadO9F/OHKmMCvucctNNNBT/42U08riFvMTIO1cYEfM85aJ3mE+H8kfXC0hef4zCc5GTGq6NRqq9bXGeJYBFqT8g2H5x7n452AA1T6hQO+hiO7cwHgrQwfPfbXCcacvW4DFTnhAo+/ZMaGqOzbXHZc4K7QlJqdPXNHkcXzmMc6OKPEw5nEKcT0ba4zhLBItSez0GjGI3d936Q5rNtj2KVTMBipLP/tVDV3xMNuSC49MJDMeSSlH+hv5iXBt2wcRg6AAAAAElFTkSuQmCC" alt="QR for NGP-ZPS-002">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Kirmiti (Bharkas)</p>
+      <p class="block">हिंगणा · Hingna</p>
+      <p class="id">NGP-ZPS-002</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEeElEQVR4nO1dXW7bMAymaAN9dIAdIEdxb7AjDTtSbxAfJQcoYD8GcMCBFCm5AQJnatPNMvnQRpY+pEo+8F9qICiTAQuBAI5cE1xdcU8cuSa4uuKeOPKpn9AUVF7hGkI48I8oLdgz4FcAecK/lXXBnSCBaGxIBHqa9WGfh50+syUsjDhta5/oyCd/QiGqFmiUOcNBHjdEdG6BTnk9Ky3WSP6trAvuFTkEIc01wBBCgOE4Q3hlZcQTT3rPhwUfX3ojjvzGT6hnPdSPrJHGhsKr6KbzCw+f9p4PCz6+9EYc+U3+0ChDYD3UkJk2IjqJU9S5P/R3gjtBgpAmStI+93+ouE9dHxOwGNmyfkkjdnuOonMugYbjJRBM7CMdIMg8bXaf6Mhn27ITWyvxePpky+KQZjN3MtFFu+ex/QOCO0G2AHANol8IpoZ10ByfcWqoFbsV+hNrJM4BQHdlzTVubp/oyGfqIUoqyHKMonjMiZ51Fhaqyv2hRwR3xSGKYmZMrRVPiy3TZ/yKecXk8jx1bUzAYiRkZ0frGp1QRXg1a9QWA3yJ92XW47IKmYDFSIjaJ0lkSaqNQYzjcw7AZl0P1cYELEaC2igwP0e1j+imxlJDkVyZUu4P1ccELEZCNlm3TpH4Pv3Cnc5pa9dD9TEBi5FgeR8JySwNlHLXlDJFasHcltXKBPxsbA/Z7TFbtmgF6SOv1Kf22L5KJmAxEsxXVnc6l1ZzihpyMTaRy33q2piAxUjQaCyZsdNHNkFOCNmEx2VVMgGLkWBOdMpTp3R0jsEopiHV5nmOsUomYDEScl1D84kW4OfeaYhWLeapPcdYKROwGNnaC6mlzi0NhwZC//aDYDiINuLqKxdeoXuHwB2NwWuuNTIBP4mk09QuMtF2muMapJVae/In5lsebnGfJYJFqD0h29hvBtDMUdNwgwcNrHv68RrXhP5Nznk0c4i6aWrnre0THfkdsT2p15xyRovK2Yc6rNc6HhPcEbLhY2R8bkwMmpwvC3KQoyE7EdRQ+HVuuSvWEo0b3GeZYCEOduZTBzZUTJAZhp/vHJKJJ31lS/fOJ810dYCOf7ktq5AJWIyEHLN/yCwm17mzlKNmj/ysdKVMwGIk5J5F9XOs1Sz7SKQTlsX2XtgamYCfPtcBNkyFV3WUKFVCrDPE62VVMgGLkbC4zyNGXnZUyGzZbG371qvm935UyQQsRsKip0OGsUAWiUTGplQJUfG6fX1MwGIk5FbqZcd07vigfBB/2R/rvR+1MQG/5rw9WVfswmRBvtHB6OM9+TUyAb/u3o+TxfHmZzfpugbTQ36+rEYm4Nfcg9bxfVXyYHpZ9MLSb77HoR/1tkYp0G5znyWCRag9IdvlYDrIzR7c9tEwpUa96KM/tzNfCNKCVl//1V+LjvyP4zIwnaM5xnRkEZIDZClqj8seFNwVknKjazzIcQ56H2NPl3idsN5BfLzIhSAb3WeJYBFqz/egUYrGbns/yPLZfkaxSiZgMTL4/1qo6vtER64Iri24K45ck/JP6A/VYfraXfudXgAAAABJRU5ErkJggg==" alt="QR for NGP-ZPS-003">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Ubali</p>
+      <p class="block">कळमेश्वर · Kalmeshwar</p>
+      <p class="id">NGP-ZPS-003</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAExUlEQVR4nO1dW26dMBAdz0XKJ0hZQJbC3UGXVHVJ3QEsJQuIBJ+RQFOdGduXpIqc0JAUmPNxBdhHjWE0b7tBaB16XkkkcmYJXJzxFpxZAhdnvAVnbvqGxhBxHUOgviEKoZlxW9mcEEKFZ3qlwIB/lRL4JEwSGS6ioFYmohaXHQY6wkAeJbpgisRn3b7Wyc7c+A0FUy0KaB+ICrXyHIhq/EBBqYSp0rp+yr+5BryKBTjzi97QWBH1zRyoN9NWwYJdRM2YdMm0fe6/+SHwx6Yv4MyvekMXWKpo0Mx4KdohXS3gX6UEPgmz0t+/JGS8n6RvKFD7u5qE6DlI/wO2rMbU8bv+Wnbmf/qGZgu29D5cxztRjyf8TNrHnv18hKXTmc13/rXrwCt55MwiqqhaFNAv/YOqGyieh+cg9gwa6bW+8q9SAp8sth+iztGInqhWQZpIujoG/dLps8zw2P5gksCrmXRzovVKU0PqRCe5ukgSJPwMykAKaV/rZGduLENi2sfiMoRkUEECeemSDOktDF+8dRkqgk/CJFM3N2sFTZPUzRRtmVk1zLZ5Klf7Wic7c2s9BCRByrUOEylIWDJtcdT10LvAJ8oPXUSjLukt+CIK7YDwfawQiGnBY6Kgfnb7WE2BqJr2tk525qa2jOzHLBi0T1RL+szcI9U+lmP0mut7wSdhksrLwveJdfvoXUsO+m+VEPeHDikJvJpJMfyy5A88nvTMRjvt+LhF9ElLuU99NEng1UxKZmwpPlHTYFgNGr28Mlnb1zrZmdvHZVO6tfBL80OXFIPl9rOYKXIZeg/4JEwy/9mcHfV9UkIoXUn2qXPy0W3ZASWB/4U5Ir5H9K71+HaYQ8w7qpF7RAsjSvZoYbRGtN77qY8pCZ8QlwELxROdbUn1Mks0ZudpX+tkZ25ecx1iOvp11YNy2vq1o+RfpQQ+CbMiGmHCIBuWkwZgvLR1SPofMW0d2g7tRMhiE112t0525pZvqBaRX7arjEh+hTvRRrQQ0I0WlZFu6bhLLUZ661+lBD6ZPzTkDWWvwjS6JRpje0iM8ve1Tnbm1jLU4TJ7zWln4pR7P1TMLssiiMtQEXwif+h+ClTDZo1wdqy9eka1/ilPm3X/RxCqn7DDY9jdOtmZW/dTd4suaskWDMgpR9vn6nnq94PP15MveZe9DcQ4nmKrY6zI5qt9rZOduWlcNpFtKLtaKnHG3vqojKhvVGjwDAO6aciq+v5VSuCTMWvtC8JW+wZKBoc0oAgSrnpmQ9oqFAsj3/7Xfhy8gmNwZhGSw/p4dox1L8Z0NGWNFN2jvM3DbVkRfLZ6mSyKYYuBLntBi8Z894cOKAm8mkm3nsVYS7UY7GU0RsuORvepDykJ/G/7Oia9DOowtwNJ0HM/iGYUzRoU0uYqtMN9qqFd97dOdubXnIM26hlWLwtk9YSGIdTQcEYjjrSKo/5VSuCTMKvlTS0oymvtfq6o/Y1g3hTUE04AuZ8IKepgBm1f62RnftkbEiuQvUhbC1yhEB6ekSSiFOD7VymBT3oOWmgHrY3NVXKFCHpIb2HpUCrrG+8fOp4k8OecgzZWOLrzTrSJyPqHFDkai03V7g8dVBLWIfj/tXCo78nOLIBLE96EM0tY/4b+ALxDoA0yiAfoAAAAAElFTkSuQmCC" alt="QR for NGP-ZPS-004">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Mahalgaon</p>
+      <p class="block">कामठी · Kamptee</p>
+      <p class="id">NGP-ZPS-004</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEq0lEQVR4nO1dXW6kMAy2DVIfQdoD9CiZG+yRVnuk3mA4yhxgJXisBPLKdsLPQ0Un01FL8PdQBcgnEeaTYztOigx56CiTCODMPdBuj4/gzD3Qbo+P4MynfqEBIy5DDdC1en9CxHZCbQEMNejT1LP2X+UToBMxK1YkvSBChy8M4fbCUVLNO/JVGkF79t/5tnmgTB4485PfFs20NKPdxIuI5u+rXlaskkLUSzFalxUzB+TMor5Qvb4YfjEGBkBVTrghcLjVI0LTA4S3evzutyVn/vQv1IzAf8UihX5C6NqK8SLzW7jJ/Nb+sLe9C3Rf9xWc+Tk7xPM1hr4VT7pihOYfsjyT64RGug7S8m+7BzoRc7JgS8Mvc4C0JT41aqxmU5t40p32bI85zjxQJg9Ow6yjaVEME3L3OgJ3LSB3bWW3GeAdbab75rclZ/7ALwTMvRgeDcnsD7PG8RbMg0b+GsyrMeJRHlTMV/8990CnYvJ1eOH0Z57QLNSfEC/Nkj2S+U0fHHGcOaAs1gntUNAco2hjziKmvGMlrpCmIcUEiZr00u1QYUqghzQEsElWiwnS2UpmNVFO0pXapthyDZWmBHpYQ02UT1zS6GcD1atnpJJSO5Qk5XaoMCVQNrMW5YwIAwLD0CJD8y/eC28SprXS4gk59Cks67AajzZOcuaT/SEWS5NisGhzVo51EFdIZzqPy+4AnYsZdMpaAnzNMYorZGuurS68SmXIsjZ7yHFmgHJIp2KCudJLvGXQlgVnYoe27rQxjjVOcuZTNTTOQorzVnSxxYmOEf2mpQGba2gXdKq4jC1wV1ieOmaFwHJBpqGNqXINFaYEymYCb5GmrPT0uiSE7DL6SK6h0pRAD2uoX8dl0dzM2ekoru2S2rHGSc58tj90TQnEZd6Kbk8Tk4rRPUqJANfQPuhUNWgITcUYblbCCBjeWov3warRYKoZYJJ+WgXSH26c5Mznr7mOtqSx+NT2h+ckkTlKs2Ptc9ku6CRMWFZVozbkpgb469X6MVZbWx7J47IClUAP54f6eZlj9axKerGStGivXENFKoGymXUq9tAdQSBF+NUI3QWAu9+6yjrVEHiSfhPKsqxUyro/VJ4S6OG90q/RGJknbYGYljAOstlVtr0K4vZELXU83DgzQblEOBeTr7p/tXmXTay6zaMG/CNhmlXALqkhgQVsRxxnDiiLdSYmrGs65iR0jMYgedfzsqxFbZ5jLFAJ9BWxPcRixqScVXm1Qie5VGjtsX1pSqBsJkRFpISQCSmWE/Fcjaby2S7LHmuc5Mxn54dgpRzNNi7nxFRrIa0q9v1X2QOdcd2+j+bG6kGWjYphtSKburiGClMCPb43CJI2llLq5F3HZHXadO/+UJFKoC88Bw3UM5rQ1NRJaiieIpOS1Z4fKlUJmeC5dGhTBhvdaVZxxYrGRPH1shKVQF/DHF5SJb7qRU/ylIacBaLGaDXxff/b3gW6r/sKzrzvC024HAm7nNTALMeiqZUyNfm5sJ8CnYQJy3afZY1+M3lV88ENc4Tm+aEClUBfG5exhvUxGoN5CXbe0uEaKlAJlM1E/18LRf2e5Mwd0F6HD+HMPeR/of+WZ9OpyW7bJgAAAABJRU5ErkJggg==" alt="QR for NGP-ZPS-005">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Dudhala</p>
+      <p class="block">काटोल · Katol</p>
+      <p class="id">NGP-ZPS-005</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEhklEQVR4nO1dXW6cQAy2DVIfQeoBchT2Bj1S1SP1BnCUHCDS7mMkVq7ssQeaKmIDSyUGfw9kJzPWasgn/88EGdZhoJWCACG5BFpc8RlCcgm0uOIzhOSub+iGhgsAILZ3H2MNeAEZtgA26xPxV1kGnUQSmK8VK6DjEbiHSj7ZEKAZfV36nUAk+mPtk0Jy5zeESbUIlDlDq58rZn6thVcZorREI8VfZRl0UkkUcA93hAERYXgZAS+ijIZMs2d/5+OgL6z9GyH5v95QJZZqBPx5FYN2rRgvatpev8lwn+/8CuhLq+cIyf3eUK1PC/BvLbA+BqxGGNoKoOsBeHh5R/OMGll62/adFJLF+dRgEMWz8DCET10eE2i1ZG2qJUHcnhdVN++o2odV5wwtoM7zYfdJIbl3bN+LoVKPRx4W4OtQ4v0U/utEk/IAEds/ADqRHnpH1S8Mt0p00Cg+0l0doFrtFna9LUFo7iJxPdw+KST39oc6yQqlpKLrJjFybBPqMukwqarwhx4BnS9PzclapQBfrJVM59y1Bv1qy5RNkacujQm0nUOj1zUapYp4QckVUiIppVQ3OaWi1lEYE2i1ZD19FI+HU/xlXlAlQ8kUIQB319YmOz7ePikk99RDrKrF/ZxZ+DWlhqTcqv5QSg2FHnoIdC7JLjFnKreCZ4pAKmftHaF7rd3tVpt3yH2uAK0ROpUkuOJRvmQ9lGd7zxSZn50cpfCpy2MCbbRlMNko86S1rlHNYnuP93UYPnV5TKDN9bJGPR6P3nMPGptT5PoqkyvistKYQKslIfUnmhnTqoexyXnFnhDKNAtbViITaLM/BDmfmEIy+Ne+sZmxyDEWyQR6Sp66nwL8VPoQpNjeU47qU0dsXyITaHuO8V5Dx/eapfMMu9/fGYZWtZFUXyXlCM0boHQ0YtRcS2QCbZa8Sev9rZ4VPJQ+KK3UFur7rA2Puc+vg1bInDa2h+kcUHaPYFa3T0uschZxWWlMoM0catT5mc6SefVV4M52doqCQwUygTZJVuI6i90Sg6b0GVAPclTsJ4Iqxp9S6xjarK+Ot891oJVycBrJOrnTAnGnRxh+vIkFU0/6Lj2Lb3LSzFYjNPLjVo9H2yeF5P791Jz9oalNSJAnrNwqxi1qHQ+BTiIJcxfHH1PzK89nrSkk6mVFMoE26yHwoVJlylMLpk/zBPax9kkhuXe9rJNnirz8qJDbstHLHN6rFrbsQdBJJGHW05GHZrxSpfVDDU0Reqg8JtBqSXAjlVniymjqPIPcPzT1x4YtK40J9Jzz9mwHOeYmC/INV5k+ivCHCmMCPecetKv8YpaOVkzXNbgeivNlJTKBnnMPWmMxGF5u32a9sPxLuvM7SWXLbY1Wmz3iPteAVkmdSRLmvdN+HtG85nw/w7yV2o/Chi0rjAm0WhI+9N/7cVb+JzXU5zNnEZeVyATaKMlTA0hq9nhFu4+x4/d0nbDdQTzdiHbEfa4BrZI68z1onKOxj70f7PlsSxwda58Ukru9IYz/tbAAWlrwKUJyCbS44jOE5BKO9Yb+AGfQ5QootXzdAAAAAElFTkSuQmCC" alt="QR for NGP-ZPS-006">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Ruyad</p>
+      <p class="block">कुही · Kuhi</p>
+      <p class="id">NGP-ZPS-006</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEUklEQVR4nO1d3W3jMAwmaQN9dDboKM4GHenQzexROsAByWMABzyIIiW1QOGckvTOMvlgRJY+pHY+8F8qMtTJTJVAAEeuCa2u+E4cuSa0uuI7ceRT39AZVY4AgHgIlyg94BGuGO/FWZvwX2VdaCdIYD51LAIjL+FOFz6l4bDYungvSEBM23pOcuST3xBG1RLpswC/H+R2x8wfPfCU1welFTSS/yrrQjtB9l/GPGO3IAzXHmYMw7elRxh+9zAfu+Ux30mObPsNjXxBsVYwnjrGo+imj5cwfNp33ix0+9Iv4sgf8odOMoRgvDrOnhFP4hQN7g/9ndBOkCCkiRIUz8pFxX3q9phA1cg+6Jc0WgDmV9E5F+T59YIM55BPPADKPG/2OcmRz7ZlU7BW4vGMyZbFIS9m7mRiiHbPY/sbhHYUl12DuumB4SyR1xLvhdRQL3YLxylopJADkIANhtPmnpMc+Uw9xJZP1Byj6iZzohdVUFCoKveHbhHaCRLMUCVrJZlFsVZhWmyZ3gufAq8CuTxP3RoT6C49tMRLUdcI7pFOnIRIQinRTUYpr3U0xgSqRkLUPknUp7ZcEMQ4PucAIrlcD7XHBKpGgtooMD8nmaycrIbIpiFTyvVQe0yge5Fj1D6pIHbuLVMEV4T5cEUYP3pzu2XdJp+zQqgGtCskWN5H2z7MsbbZyTJFasHclrXKBKpGgrrTyUapJ53rZYtqKY33Zei2rD0mUDUSzFcWj8ei99SDxuoUJd/byOVxWWtMoHtzjGBmLLPJPrElhBLNPC5rkQlUjQTTL6VjbbX87pN9i1ZNE9iuh1pjAlUjQa1VdpgtwM+90xCtWgz6PcfYKBPofg4tn0v2UstntW+aH3I91DIT6M5+apbe6Viyl6J8DPWvPYzT0nPOGYk/NL/9q7+WHPl/x/ZQ1MvCNdfyR3OP1BXyuOwmof3F9qxsSryyGEyL96kO6xxqkQl0D3IQT/qKeAyNaEKfGWUjR8cw28Yz/BVqHfMh6avNPWelUC0Q9oKE3G+m+sXUzZd9rqCNaG7LGmUCVSPB6mAps1i0CQVJE0op3yvdKBPoEb0frHpI0talj8RxIjanSYuR1zraYwLdva8DbJhtWax/cKqExJSjrHIOtccEqkZCcZ5HbuwoGkCG0j2yjkbnUHtMoGokFD0dMowFspSnnqyWX+yHdT3UIhOoGgm5lbqI0IqOD84b8ZVc7g81yQR6zH57Vr7YRJfq9upJW8u11+3bYwI96NyPrtiZaH52l45rMD3kvR8tMoEecw7acEGewtbp6fxS9MLye+jOH0MqGw8y6+cxtsqEKuGidzq33lumSKVopU55pG09JznyZzjEmk+09CKXqaG858zjstuEdoXk3AASmz0+EGFGRDlaT0TPIH69yIEgG33OGqEq1J7PQeMUjX3t/WDLZ2viaFvPSY582htC/18LK0JrC74VR64Jra74Thy5Jtt6Q38AEE80HdbVwFYAAAAASUVORK5CYII=" alt="QR for NGP-ZPS-007">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Rewral</p>
+      <p class="block">मौदा · Mouda</p>
+      <p class="id">NGP-ZPS-007</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAErUlEQVR4nO1dW26jUAy1HaR8EmkW0KWQHcySqlnS7ACW0gVUgs9IRB7Zvg9aqSK5CRkBPh8IuBylFyxfPw4UGcrQUSERwJlzoNkrfoIz50CzV/wEZy56hwYMOA8VQHe6IqJs9FCAiBUgnnRPIQP+VOZAO2ECc39gBTQ8AjSypwMtyEAaBTjIJRzOteuaJzlz4TuE5lrUcgZEM6SGLwhQy8bOjWBO6/yU3ywBFbEEznzRHRqOjHg6MHRxaUM51GWM27i0Pfc37wLdd/kEznzdHWIW7xMWtENI2po+7i3ym7eD7rj2K5y53B2qdPvNQhiGXyN3J0Bo/lYjA1yQu9+yltVy6fDYb5IzN3eHrpZs6TGeZUGTiAffo/exc+8fkrXplaf/+deWgQp54MxZVMG1KMS/dG/qbsTxvF2Q7Zx4pO/+yp/KHGhnuX1/mGT0ALUa0gjc1iHp51bPJYbn9huzBCpmAnMfomZmNRVIh2ZXYi9mSLLpNexmt6HNWQIVMyF4FXMyqZ4oLkiMi9toQ2ZrIHt66H5oY5ZADzLxXe2lvkhVSOqJEj+nBQ3PcEUJisRBXaXk6L2OrVpCEVjdja5bFvaY44kBUKMDcWkLLsj90AYtgR7MyxDgANxp8lX3ciieZqgkEdOGxwiobqn5qEYZHdc2T3Lm8n4IIAbMGgqp94HYgjXvYzVG77neCtoJEyyKtpRM06+0bhn63ObIqZvn9tuzBCpmQki/cl5m2VgcbVXxkTN6Tdg8t9+gJdBT6kNtNin1NDKsCxp83bOa0brmSc5cdC0bbRNUZrFcNE3EIMrPQqXIbegW0E6YkEWKIfaJVSGNnyFtLFqy4qOvZRu0BHqEOYR6IuKbSIfi0hb2PlLJcUC0ha9zPfU2LaEUnKTUsc0RHU8Itpm/JGwpeFrXPMmZC+uHQGWw+iKHdDO4FU2RiojOepW4IA2xRRkSsjZ/KnOgndUYBdbcsBpjTvo5VRuzAMT90PYsgR5h1myqe/U5/AePrO4GUdRoltGr5QzHKDHSw9XNsxBUSoTdadAgvlD2LU2DXGgMcqKQ5a9rnuTM5fVDPImaY69jDGvZpEsWzcxtaB60o779KE35a6XaaQzyaomz68902VXf/0CG+lPe8OhXN09y5tJ16lb3Y8BsA+Ech7qjvefqderbQfvToLH1y5IWNjQ8IEhBLBszC/O8bHuWQI/mZWetBYnPke9+TF5x7eTVaV3aTAYrLw2Zsnp18ywElRJhb8xaFzQ1FXEyIqqWJgie9ZsNuYeWX7pf5zzvBxVw9sWEnNaHiEcR+/Yw/ZSMIvXy1zVPcubyOkZBarfmgTZFQRNhvsdDN4H2pUFTTKRDMbCG5JuyotFj6k1aAj3pO2gcP4aWaowcdfqTCqT7oS1aAj3nO2gDIv/RRCw3yOpRBEPSQ7MPNabRNc6zBFTE2hMTcvEn9MFi3XEqoK6n0ljvl23SEuiJzFrLRVkVyxZET1SO/q70mp7nS/plMP2uEDa99sa0fXaygdhNk29YSausOx1WN09y5mu+gzZU8unOI6uIyPRDipSNBUWjx0M3gXbCRP9fC5t6nuTMGdDcBT/CmXMov0P/AJ9XroBKjX5DAAAAAElFTkSuQmCC" alt="QR for NGP-ZPS-008">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Durgdhamna</p>
+      <p class="block">नागपूर · Nagpur</p>
+      <p class="id">NGP-ZPS-008</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEn0lEQVR4nO1dXY6jMAy2TaU+UmkPMEehN9gjrfZIc4NylDnASPA4EsgrO05IH0a0obMzDfYDopBP4ueT/dlxKDKUWU+FQABHrhmtjvjMHLlmtDriM3Pklz6hEc3OIyL0pxkBYEbEuAcwHgDPsjE7+Fu5wWhHyIbV7EigypGhezsy9Cc51n4gX2Sn05HDd15tmVEhDhx547PF4FraCfAslLoIaf6+THKuYejxyIj6U5zWOUOWGDmy3ic0HsTTfEgEa8QPIUL3JmGsnUD3ftTV3mV03/DMHHnXE2qZ+a+GsWEWZdQwnkUPKZtCVPsEeZeRI6t6QgfdLgk+dsMJobs0jNC+I8s58UvRWhk6ftfVkiN/6BOaQ7IVYpmGsRDV3o6s2ZiFNlHSvY5Uj+Tvc81oJ8iDuRa1cUbuXybg/gTI/akJhxlANFI7Zf7q2e6THPllTwiYB3E8opptw6x5fEjmQTN/TebVGfEkJyR187eyZrQfZJtoMR5lkwKaUkoi3bnV6pFWGyW+6Ymnu89Co1Ig7AUJzCyJu3oaTeFjFTHWHRuRQlqGFK4Jm/Sn+6HKmECbYhnAVbFaXFAoNHJgTuSV+ibbcw7VxgTa6ocgY46SZjKh1IlHCpFOY15yVe6HKmMCbdbUYNI5sCQl8yz0MUopc+JZ51BtTKCNHGKlSuBG2EAurLvIIc/L6mUCbeUQK5GS2FGNJCELRADFfF9ppq7KY1l9TKBiJMQYlfKtyJeYnE2StV3J6YB4rvskR36xpuZF7Ejcit5nsrOX6z33Q7cZ7Sq350VYJz8UvE8XfFPSQ+6HamUCFSOBr828T6gZgfkck9151uaxrDYm0GYODZaDZRLbtM8UK9btUs92PVQfE2hzjbFdxM4ijzhppMVBpfT/ue6THPnFPWgg4Qm127UbZsDu9RR9Dkg3GswHBpgBpTsfoJUz/lbWjHaChDxkpRTeCo2NzZdZtTFKJp9zrZEJ9IjcHgI35KAm+Pls/ZTCnRarXQ/VxwR6RG7PKf2K1kS+QD5z5hyqkgm0SQ81k65ClJ/ShN9M0J8BuP89SPPrfICOZxk3I8N4kk5Z10P1MYG2INuP0Ga/NHtYIqYtjKMsdpX1QmK2PFFbHZ/uPguNSoGwJ2QT2mDxLGzSjSx7xT9hUaJ0wC7d1mIhYXu++ywzKsTBbpAQOxWvGsxSnRoyAbTM4HuNsUImUDHyADD+kgoQSPHHakHic2TzrmrJFgR1bwjQvSKw+6EamUDFSLCadCwIWZ/H0ibULhEsssnnOmpkAm2f62BrfrVq4/KdmCYnUtZ3/Vz3SY78P/P2g7kb66xOCxXNBaUGR1/XcZPRTpCQ6+fUK7S0V3OoYsdj5qq8Tl0fE+hh30HDUAGSeqJGsF5KQ/YVmVis9vpQrUwoNE4tjFdtsCanOU2kxWn8KJRcD1XGBHoMctTPV6Uqon7JU3bkWyDqjLLA9/1Xe5fRfcMzc+RdfmjIW9IsV2PTQ7HQ6L2wNxvtrX+Iszn6q+DVZAzLVgl5LKuMCfTwvAxSNgZpCjYtLXMOVcgEKkai/9dCVe+THLlitDbgU3PkmpU/oX9J0O2EdUeV9wAAAABJRU5ErkJggg==" alt="QR for NGP-ZPS-009">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Thugaon Nipani</p>
+      <p class="block">नरखेड · Narkhed</p>
+      <p class="id">NGP-ZPS-009</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEKUlEQVR4nO1dUY6jMAx1TKX9pDeYozA326vBUeYG7WclKq/s2EnaVZchpZptsD9QgTyp0Cf72XHSQFBnE1YCARy5ZLg44pE5cslwccQjc+RL39A5qH3CNYRw5EO0A9g14E8A+Yb/KsuGO0EC0akjMRj4OEI+nQGgn21cGiKI8b2eEx354jcUomthG+gSYDrK546Ivg5AYx7PTos9kv8qy4a7RF6LCAZTCAGmjxnCJzujKdHsf/m2awxXjS7NkeveUKcRbDjxp1NH4VOuff3i038h1xg6sqk3dJCjJvjnI5AcptDNMB07gGEEoOnjElQZ9Tz0/FPfFh35n2pqUEve5/FBzTX1dwx3gjyoa4nGsudD3M0liPch8TnTEYLcp7d9TnTkq3P7kQOVKB4+SIKvpzRb+i83+pj4e27/DcMd+aELu5sDS6GOfdDMGukqAuggcSsMIw/hGgD0V0ac3u450ZEv9kMQFY8UFdM16K3QGFOyXjyS6iavMS4b7q1OPUeC5Dp1rCwOfEOv8SfmFZPLOdQaE7AaCUqY6HjMDzF9Mq8gTYJEZySU8rmOxpiA2/ghYicTOSShjfiU+ZJrABLQXFM3yASsRoLGKDCdk9h0I5RI5ZFSyv1Qe0zAaiQUUiipIGWJaGrzPplNMcH3WNYYE7AaCVb3ESmUykDp7miVImWYx7JWmYBP+iHIMUrdksxrdEVuX8huz+1bZAJWI8G0clI8whLrQSMVReavErk8lrXGBKxGgmVjGsZsen6+5RWpPPK8rFkmYDUSCgE03M6c3cc3MgflNcYWmYDVSMjzGncJfu6dhhjVrAbguX2TTMBN5u3LRExze0p16iLBdz/UIhPwSWT4nVvvsx7i9mpupdYbZ57Fz6fv+Jw1hlWoneb2cDtfpmk9lfLIYp7nZe0xAbfI7UnZlHhl9USdvI+nPufaKBPwKWTHsofjFjeiCX2mIAs5OrIVQR1JuOM+ffNX7/ecdYaVONhdfahP/sXczd06V9CZM49ljTIBN5m3h6KymK9Rql3rXV8r3SQTsBoJpcSxQ8kXyne1J9/ny5pkAj5dH4J0mroXo1CiNBMSS452w3s/GmMCViOh3PIjN3akBB9u5JF1NDqH2mMCViPhvpVa15JZnXoUZZQq1mrOofaYgNVIsCCVWGKqOXeeQeofyv2xHstaYwJus96eUvNrIZQ629Iq0cd78ltkAm6zD9op9X7kfB/ydg3mh3zOtUUmYDUS7vtedTlrzvLppjvfez9aZQJugzwftLsj7qWXCo2DTHPwhiDFRlY//m1XGa4bXpgj1/oh0uWs9FdpaExi2/Oy7xnuCkm5ASQ2e3wF3Y9xoEvcTlj3IM47or3jc9YYVqH2vA8aZSl01/tBVs/2NYpNMgGrkcH/a6Gp3xMduWC4NOChOXLJ6t/QH0HhHAKu3ua+AAAAAElFTkSuQmCC" alt="QR for NGP-ZPS-010">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Mahuli</p>
+      <p class="block">पारशिवनी · Parseoni</p>
+      <p class="id">NGP-ZPS-010</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEiElEQVR4nO1d223rMAyl6AD9dDboKM4Gd6Sim9mjZIAC8WcBB7wgRUpOisKp3BSwTH64deSDQO6BePiQGgjKbMBCIIAjlwwXn/jOHLlkuPjEd+bIp76hMaidACCEI1+iHSCc4BriZ3HUBvyvsmy4EyQQXRoSg44m+yzftnefsTGi39Y80ZFPfkMhLi0gbJoAhiPY7fkA1OfnedHiFcn/KsuGO0UGZdM1wBBCgOF1gnDixWiIA0/4zscNf/DsrTnyD99QRxOEt0tD0F0aCifg384vfPu073zY8PFH78yRz3tDB7lqgD8egeQyhGaC4dgAdD0ADa+fQZVRy4+O674THVmdpgY1XngWLmquqetjAhYjD7q0RGPZ8yrLzWeQ1YdkzRmOEGScNjtPdOSzY/ueHZUoHr5QLypIbmmy8F8G2pgH8Nj+AcMdrUOfQdYXgrHhNWhijXQVAXQQvxW6Xh8J0F4ZcdncPNGRz1yHiEzx5ByjaJ/WEo0xJJPbuFS5HnrEcFeamjizqN4qJhrZW/Gw+DL9jH9jIjGbPE9dGxOwGAlKn1zXaIU0c16BVDhEI+mor0P1MQHX18sm9WryWdTU8Zb5knMAzCHX1DUyAYuRoD4Kks4xjRRFUReFknowo5SvQ/UxAdciuxi4q6aONdeYKQKunB2vAbrzIcoj9XmbnGeBYQloV0iwvI/w5dZvZa8WZTeLIvdltTIBi5Ggcjr5KFXSUtdoZrG9xfty676sPiZgMRJMK4viMUclAiilqEE5lIjkeqhCJmAxEiwak2qGrTRWo6d8sdSQx2WVMgGLkWDrS8onSkUs6qHmxr+JV7MIzXOMtTEBi5Gg3ipK5lRfNb6QjiqHouL22L5GJuB65FX7pDmsD6fxheg9NlVz9ZULr7K5gxscY2vsVuf5Y8OfQ/aJHEJqvc96SHhlpQ+Akav4+XaT8ywwLAHtCgnmo27q9qncCrO6fayXaeXM9VBtTMDfiO1JM0UpZ2QxmIntLIqcQ/UxAdcgW+bGmfeNjQelzxBkI0dDtiOoofDGtY7hmML/zc2z0LAUCPva1xH4QsORd3P8+2APJkr6yj2LH7zTTJ8O0PKP8TBtbZ7oyL+pl7Va9YgDKrHJKhzRv/le6YcNd4KE3LOoOsdazbJGIh3Qnnyvl1XJBFy9rwO+thPp9nuySkhMOdqAn9lQGRNwDbLlzdHW2BHlNBv18diYayCiT85ASidRiuQ2N89Cw1Ig7AUJ80prbo2Ne85IG4bmNTQxX4fqYwIWI8GcVGKJqebceQapfyj3x7ovq40J+Dv77Sk1mM2EUmMnXCX6eE9+jUzA3zkH7ZJ3Q8+FNehxDbnFyHs/6mMCrkSGeHJVrrSOIqwbLXO8c3d+dzGJ3Uv1dYvzLDEsQu0JCfPe6Zv9iLPzGWjWSu39Q5UyAYuRcNd/bzlG+pIa6pPY9risRibgSiSlzR0qrM9Bz2PsODXEpmcQ5xPRtjjPEsMi1J7PQaMUjd33flAK2GLiaFvzREc+7Q0F/18LC4ZLD3xrjlwyXHziO3Pkkm3rDf0HJ2rmJ1+D2yIAAAAASUVORK5CYII=" alt="QR for NGP-ZPS-011">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Ajni</p>
+      <p class="block">रामटेक · Ramtek</p>
+      <p class="id">NGP-ZPS-011</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEaklEQVR4nO1dW27bQAycpQzkUwZ6AB9FvkGPVPRm1lFygADWpwEZLMh9ukUgex2n0IrzoWglDRLZA5JLcjeOUYeRKomAMZdAi098BmMugRaf+AzGfOknNLmAIwDn9tc4dju4I2S4B8LdeMO+lWXQRphgPneswMAz+KTX4hDo5VBcEwjjtK73JGO++BNy3rTI2S+exRjpoGPm953XVYAYLbFI9q0sgzbK5N/uTcLsq8PonMN4mOGOYozGKLMv/533gx549hbG/K5PqGP3iy9OvRWGc8fuCDl7f5Pha37nI6CHni5hzG+Kh846hDivToxRFwKgkwZFvcVDj4E2woSKxkMMz8IhwGLq9pRA1cyd2Jc0krDnoDbn4ng8XBxjknziHk7v82rfk4z5al92Em+lEc+QfJkf8hzdnd7ovd+zuf0doI0wdzoHY0w7MKZObNDsr0lqaOfj7OEkFklm/uivYrnOq3tPMuar46FBIx5NKkbbFIPoORgoFKbK4qF7QBthwvuofBA3FryV3A65a70mZ6IrEZflqVtTAj0/t5/LukYoeMzRSnlJqW2KkrJaR2NKoGomggmKyIZHlQM/j885ANGQxdQtKoGqmQg+CinOSSpJyWp4NfVZUmaH2lMCVTORXVY0RclbaUxdhNM5bW3xUHtKoGomYt5HQ6Fbv+Ujo5ApCh7MfFmrSqAn7RCyjwpmKdfL5pB3DPP9YJEspm5NCVTNRIyVNeKJkzMNgFKKGrkYm8RlGmpNCVTNhJ+N+X6z7NVSoR45IRRlZvOyJpVAzzAn5/gkbdPHrKt3qXJI/eMkBz5fHQZ/6Dh0Oa7uPStBtURssH+IU9XDx0ipdxreq6Vua5vbt6gE+pI89VCU7MPcnlOeupjgW62jRSXQk0x3VL+l5zkeUv/mixuCSfxbHq7xPWtAVawtMZGTikXdPpVbUdTtfb0sVM5sXtaaEujp/FAfUtQ31+ZipVlML1rNtVEl0FPMTpaRyboxnYOJfEZZIKSxz+hXBMmCD5mrjfuYaFzhe9aBKnnYDHMHTD9mp03V476bMf78EA8mfYzQnsUPWWkWnnbo5ce0m9f2nmTMl8dDfY6kw/KNGGJznJJln2e1jrtAG2Ei9iymno7UAZtiJA53Q0++1cuaVAI9va4Dn5TxBfksFvRtXtaeEqiaCa+StJw1rv5JaaA+zMbKXUHMlzWoBKpmoujp0OGtV+NCV8V6e7ND7SmBqpmITkpVErvui44PzgvxtbSfKiHrek8y5sv7hwS5yFoGSp3XV15072EaWgRtct+PLq6azvEQ8nYN0Q5ZzbVFJVA1Ezd9r7HfLJkgpCb8vP+Q1cuaVAJ9DXNysn2VbuyJskY/aJlDNgQpNrL673/tQ6DHHi9gzEXwbf99XM7K/6SGTtFA2bzsTtCmmJwWd4Rmj3cX9mMc+OK3Ew57EB8uuiHISt+zBlTF2vI+aJxDob96Pzjms22NYpNKoGqms/+10NT3ScZcAC098CmMuYT6T+gP1vgiTS+ODBwAAAAASUVORK5CYII=" alt="QR for NGP-ZPS-012">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Walani (Hindi)</p>
+      <p class="block">सावनेर · Saoner</p>
+      <p class="id">NGP-ZPS-012</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEPElEQVR4nO1dW66iQBCtLkjmU3dwl4I7mCXN1mAp7kA/TTA1qap+4Y0BW5k7NHU+iEKfeNGTejfXEZRhwEIigDHngLMrnsGYc8DZFc9gzFW/oavzOAGAc0c+KFpwJ7g7PadXwwX7VeaBO2EC0aUhAXQ08pnp28MY1uk5BjP6bd0nGnPlb8ipaVH5jADDEcLbcwvUp/VstNgi2a8yD9wp00UPBoNzDoavEdyJjdGgMlvhM5cDX1g7hTH/4TfU0c1Bd2lIDu4E/Or8i9+u9pmLgcuXPsCY631DrRx9gn89AslhcM0Iw7EB6HoAGr5uzkdGB156fe8z0ZjVxdTgEa3P84OHxdT1KQGLma03LQoOe77E3NycWB8SmzMcwcl12ux9ojHXzu17dlQS8fCBeomC5C2NIf2XCwdN/C23XwDckR26ObEvBNeGbdDIMdJdAqBW/Jbrer/EweHOjMvm7hONuaYdIjZB8aDnJPY5hEKjpmRigtRUWTy0BLgTJgRHFb1VqFNrZbFjX+bP8SvWlajJ6tSVKQGLmeAFo4bHNzckPFLRkAZFIim/RCVlGqpMCfh+v2yMHTGvElEOaB6fagAqLrND9SkBi5ngfRTEOGdqm7pLVNMhScrsUH1KwGImJJcVlJPyfQodDs38vZo0wTdfVpkSsJgJoe4Txj4yv8WvYqXIezDzZbUqAd/N7SH6KG+WpK/RZLl9FnZbbl+jErCYCSFWjhGPqCRG16RBUbBXUVzmy2pTAhYzQbMxnTcLlUXv2jJd+SjI8rJ6lYDFTAj2JeZlsRz96N/I+zyrMVapBPzEPDWlBN/3PxiajeUlR8vtq1QCfqxvTz4Rm1ikTutDIcG3XkeNSsA35xhdx6P3OokvTXlN9e8tdP3YhilHXsu5/fD7p/5aNOb/XKduQr9Mq0K+3QpZ3z6FQpaXLQLusD5EafYjbC2jrIcW+7CmoRqVgG8yibXhTtfWy2dwspGjobAjqCH359zyVGy0V1u8zxJgEWtPTHjM46O5edjnCmkQzexQjUrAYiaIt8rjIW3Ph6AIstq1v2p7patUAn5i9oO0nphNo5HGSN7wyBLt5Vuvoz4l4Nv1IYhvJzVpQXqVO75t3Scac+1+WcdHCYVSUOR92ZiFR2EyxDS0BLgTJuTOKzNLoU7d63h1MkEC01B9SsBiJgQnFVVymE58kB9mTPs/LB6qUgn4mf32lGrSE4vESJvuFRYPVaYE/Mxz0C6x+xrn9CG0YL+NGG3rPtGYq8dDEOZeoy9LG4Qom86PNQDT0Cxwj8wr9zr4yVX8EM+wHxEAuKuvDwTJHmT143/tS8DXlmcw5qt2iHzFmr6VhvpQora8bCFwV0xKg64aWJ+dfx5jRzd9nLB/BnF6ItoW77MEWMTa83PQKIVCD7MfFHfB2h7FGpWAxUxn/2uhqt8TjTkDnFvwFMacQ/k39Be/OyO2X0/RCQAAAABJRU5ErkJggg==" alt="QR for NGP-ZPS-013">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Z. P. Secondary School Pachgaon</p>
+      <p class="block">उमरेड · Umred</p>
+      <p class="id">NGP-ZPS-013</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section><section class="sheet single">
+    <article class="card">
+      <h1>Tech Support <span>by Infinity Learn</span></h1>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEnklEQVR4nO1dWW7jMAwlGQP5tIEeoEdxbjBHKuZIvYF9lDlAAfszgAMNSGpLB4ETpek0Mt9H4EUPjZ0HLiKlooMyjFRIBDDmGmh1xCUYcw20OuISjPnQNzSjx2FuAMYOALE7+VMGIjZ8TY4EfMN+lTXQRpjg3LRzAuj1Y/E3BuAb8S7ATofoteG5npOM+eA3hGpaBPM+qumIAC1/zIheXGy0Dl/yN0tARSyGMR/3hpr8ZO7Yl+3AjQgA/XsHCO3k+AQczC/L1/xNMmbFb2jnrY/YITkV9FM4+lHf9hbQTaNzGPM6O+TiuT+aXxY3shnq35vFARzRjb/YDLU8YOYh9m7XQBtinjTZknM8zHsnEQ++Beuj197+cNYmI7v/+W3LQIU8MOYqGm9aBGxfxlcxN2x4Xo/o9BpbJEbu0exXWQNtLLefvM2RjB6gFSEt4IbW5/tukGuRYbl9ZUqgYiY4xzk7R81y5Aa+2Ge62rkgJP6YhOFMQ9Upge7UkFPrI5OKkpKxCXKslyFoyEuKj+TU7FBlSqBiJohU1L6It+KjYG4W78vUq/Fo9Wqiq+d6TjLmN9U6liAQSJLasQcLVQ81QWaHrgJthAmhGCZ+K5x6NUGIltS/RYdmdqhCJVAxEzTsyRyamiAfP0OSj+ZlQUjmy2pTAhUzQf1YHvsElSimVOZIqZtpqD4lUDETfPqlkz8hFBKzJHcHqaGljF4SNsvtK1QCFTMhuLFcPimwBnFocH5k8VCNSqBiJqh7ktBZELP8PBGD0H4WZ4osHqpNCXRX3X7HHUIc9swduPHVxz/Is0IIrRxN4MZu4qNT47QS8lzPScZ88PwQcCSdul3zj+mSp7NfZQ20ESZksXKsa4TkDDRXC6m+3A3FNdNQZUqgu+Ohyc8dZjV6DaJbiYditT4FSs/1nGTMx+f2Tg2PaijOO7p8tjE1gJiGrgFth9n6Wgce2Mj8xr2TRjRE7kbzxkiWdOxDTcRi6jqV8BXz1JCvJfvcl9Zn7s56P+pTAhUzIU0DhfJ8quUv/9Q/oswsHqpNCXRXP/WRm6WRV5DJXJAYnxMvT/yIw06y/gMdtB+8wmN6uuckYz7cDkHqos5bQUBPJU2TqWybp74etBEmZM4rpvChHX/J7oaKrPUPVaoEuofZOr+g7MA2h1cEpRwMxk5Ec0LoJ/FvR/RV/ad7zkJQKRG2xmwlL2OVaErGR3PDupKNG/xSIbn2A77t7aACjsKYq3CxBKYRT5pPFA/Wn3XKpqVClpetg7Y2P8QI9dXsxhCjoKwx3+apK1QCFTMh9SymAlnool5CNnbW0Wi1jiqVQPf1Dy2xYaiBfuC5IN73A+DEc0Ydr7I/NdhPLzqF5MbD8z0nGfN79kGbuVTWnRfI2oV3+5AbvD+IpGlWL7sKtEVmy8mZZl68p6duKuOTs9T7gW+W2z/H7/nfmG3cAi0uKONQCJEnjjQeEpn9jG97LejqkZ9hzFv3QcN+ktoYt01rKCSBkpzyHlZcKuMtG+3droO2uA/a3LAv2ztpItL+IUHMxmRfWOsfqlYJZUD7XwtV/Z5kzBXQ2oCLMOYayt/QX8X3uXNY6VprAAAAAElFTkSuQmCC" alt="QR for NGP-ZPS-014">
+      <p class="scan">मदतीसाठी स्कॅन करा · मदद के लिए स्कैन करें</p>
+      <p class="village">Zilla Parishad School Kalkuhi</p>
+      <p class="block">नागपूर · Nagpur</p>
+      <p class="id">NGP-ZPS-014</p>
+      <p class="phone">WhatsApp +91 81799 21444</p>
+    </article></section></body></html>

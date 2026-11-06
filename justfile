@@ -63,6 +63,16 @@ centres:
 qr:
     cd backend && uv run python -m support_service.qr data/centres.csv ../docs/qr
 
+# The ICT-lab schools (backend/data/schools.csv) go into the same `centres`
+# collection with NGP-ZPS ids, so the bot and dashboard treat them alike.
+schools:
+    cd backend && uv run python -m support_service.centres data/schools.csv
+
+# One full-page QR card per school into docs/qr-schools/.
+qr-schools:
+    cd backend && uv run python -m support_service.qr data/schools.csv ../docs/qr-schools \
+      --per-page 1 --pdf-name school-qr-codes.pdf --title "School WhatsApp support QR codes"
+
 # --- emulators ---
 
 # Java 21+ only — the Firestore emulator is a JVM program. brew installs
