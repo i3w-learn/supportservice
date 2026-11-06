@@ -58,10 +58,11 @@ seed:
 centres:
     cd backend && uv run python -m support_service.centres data/centres.csv
 
-# One WhatsApp QR per centre into docs/qr/ (PNG each, plus a printable PDF).
-# Re-run after editing centres.csv or changing the support number.
+# One WhatsApp QR per centre into docs/qr/ (PNG each, plus a printable PDF
+# with one full-page card per centre). Re-run after editing centres.csv or
+# changing the support number.
 qr:
-    cd backend && uv run python -m support_service.qr data/centres.csv ../docs/qr
+    cd backend && uv run python -m support_service.qr data/centres.csv ../docs/qr --per-page 1
 
 # The ICT-lab schools (backend/data/schools.csv) go into the same `centres`
 # collection with NGP-ZPS ids, so the bot and dashboard treat them alike.
